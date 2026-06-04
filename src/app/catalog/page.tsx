@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { requireUser, isAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice } from "@/lib/format";
@@ -48,25 +49,30 @@ export default async function CatalogPage() {
   return (
     <div className="flex flex-1 flex-col">
       <header className="border-b border-stone-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-600 text-lg">
-              🥯
-            </span>
-            <div>
-              <p className="text-sm font-semibold leading-tight text-stone-900">
-                Baltiks Wholesale
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <Image
+              src="/baltiks-logo.webp"
+              width={750}
+              height={375}
+              alt="Baltik's Bagel"
+              priority
+              className="h-9 w-auto shrink-0"
+            />
+            <div className="min-w-0 border-l border-stone-200 pl-3">
+              <p className="text-[10px] font-medium uppercase tracking-wide leading-tight text-stone-400">
+                Wholesale
               </p>
-              <p className="text-xs leading-tight text-stone-500">
+              <p className="truncate text-sm font-medium leading-tight text-stone-700">
                 {customer?.business_name ?? user.email}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex shrink-0 items-center gap-4">
             {isAdmin(user.email) ? (
               <Link
                 href="/admin"
-                className="text-sm font-medium text-amber-700 hover:underline"
+                className="text-sm font-medium text-brand-700 hover:underline"
               >
                 Admin
               </Link>
@@ -120,7 +126,7 @@ export default async function CatalogPage() {
                     <p className="text-xs text-stone-500">per {item.unit}</p>
                   </div>
                   {item.has_custom_price ? (
-                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
+                    <span className="rounded-full bg-peach px-2.5 py-1 text-xs font-medium text-brand-800">
                       Your price
                     </span>
                   ) : null}

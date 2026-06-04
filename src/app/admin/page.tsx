@@ -44,11 +44,11 @@ export default async function AdminDashboard() {
           <Link
             key={card.href}
             href={card.href}
-            className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm transition hover:border-amber-400 hover:shadow"
+            className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm transition hover:border-brand-400 hover:shadow"
           >
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-stone-900">{card.title}</h2>
-              <span className="text-2xl font-bold text-amber-600">
+              <span className="text-2xl font-bold text-brand-600">
                 {card.value}
               </span>
             </div>

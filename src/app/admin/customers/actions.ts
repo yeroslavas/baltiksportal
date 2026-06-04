@@ -62,3 +62,33 @@ export async function createCustomer(
   revalidatePath("/admin");
   return { error: null, success: `Created account for ${businessName}.` };
 }
+
+export async function resetCustomerPassword(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin(); // defense in depth
+
+  const userId = String(formData.get("user_id") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+
+  if (!userId) {
+    return { error: "Missing customer reference.", success: null };
+  }
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters.", success: null };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(userId, { password });
+  if (error) {
+    return { error: error.message, success: null };
+  }
+
+  // No revalidate needed — nothing on the page changes. The admin reads the new
+  // password from the still-filled field and passes it to the customer.
+  return {
+    error: null,
+    success: "Password updated — copy it and send it to the customer.",
+  };
+}

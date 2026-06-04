@@ -67,6 +67,10 @@ Open http://localhost:3000 and sign in.
 4. Sign in as the customer → **Catalog**: they see their prices; rows with an override
    show a "Your price" badge. Customers cannot reach `/admin`.
 
+**Forgot a password?** There's no self-service email reset yet (that needs SMTP).
+For now, on **Customers** click **Reset password** next to the customer, **Generate**
+a new temporary password (or type one), **Set password**, then pass it to them.
+
 ## Project layout
 
 ```
