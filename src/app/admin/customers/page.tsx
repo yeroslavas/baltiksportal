@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Customer } from "@/lib/types";
 import { CreateCustomerForm } from "./create-customer-form";
+import { ResetPasswordForm } from "./reset-password-form";
 
 export default async function AdminCustomersPage() {
   const admin = createAdminClient();
@@ -35,7 +36,8 @@ export default async function AdminCustomersPage() {
         {customers.length === 0 ? (
           <p className="px-6 py-8 text-sm text-stone-500">No customers yet.</p>
         ) : (
-          <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[44rem] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-stone-500">
               <tr className="border-b border-stone-200">
                 <th className="px-6 py-3">Business</th>
@@ -56,18 +58,22 @@ export default async function AdminCustomersPage() {
                   </td>
                   <td className="px-6 py-3 text-stone-600">{c.email ?? "—"}</td>
                   <td className="px-6 py-3 text-stone-600">{c.phone ?? "—"}</td>
-                  <td className="px-6 py-3 text-right">
-                    <Link
-                      href={`/admin/pricing?customer=${c.id}`}
-                      className="font-medium text-amber-700 hover:underline"
-                    >
-                      Set pricing
-                    </Link>
+                  <td className="px-6 py-3 align-top text-right">
+                    <div className="flex flex-col items-end gap-2">
+                      <Link
+                        href={`/admin/pricing?customer=${c.id}`}
+                        className="font-medium text-brand-700 hover:underline"
+                      >
+                        Set pricing
+                      </Link>
+                      <ResetPasswordForm userId={c.user_id} />
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
     </div>

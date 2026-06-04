@@ -2,18 +2,33 @@
 
 :root {
   --background: #faf7f2; /* warm off-white, bakery feel */
-  --foreground: #1f1a17;
+  --foreground: #1f354c; /* deep navy ink (brand-800) */
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-poppins), "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+/* Brand palette — sampled from baltiksbagel.com (navy primary, peach accents). */
+@theme {
+  --color-brand-50: #f0f5f9;
+  --color-brand-100: #dbe5f0;
+  --color-brand-200: #b6cbe2;
+  --color-brand-300: #87a9cf;
+  --color-brand-400: #5888bc;
+  --color-brand-500: #3f6c9c;
+  --color-brand-600: #305277; /* brand navy */
+  --color-brand-700: #284462;
+  --color-brand-800: #1f354c;
+  --color-brand-900: #162637;
+  --color-peach: #f6c2b1;
+  --color-coral: #f3b6b0;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
 }

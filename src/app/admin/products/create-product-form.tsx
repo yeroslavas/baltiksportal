@@ -6,7 +6,7 @@ import { createProduct, type ActionState } from "./actions";
 const initialState: ActionState = { error: null, success: null };
 
 const inputClass =
-  "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-200";
+  "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200";
 
 export function CreateProductForm() {
   const [state, formAction, pending] = useActionState(
@@ -74,7 +74,7 @@ export function CreateProductForm() {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:opacity-60"
+          className="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
         >
           {pending ? "Adding…" : "Add product"}
         </button>

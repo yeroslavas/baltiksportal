@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { LoginForm } from "./login-form";
 
 export default function LoginPage() {
@@ -5,11 +6,16 @@ export default function LoginPage() {
     <main className="flex flex-1 items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-600 text-2xl shadow-sm">
-            🥯
-          </div>
+          <Image
+            src="/baltiks-logo.webp"
+            width={750}
+            height={375}
+            alt="Baltik's Bagel"
+            priority
+            className="mx-auto mb-5 h-auto w-56"
+          />
           <h1 className="text-2xl font-bold tracking-tight text-stone-900">
-            Baltiks Wholesale Portal
+            Wholesale Portal
           </h1>
           <p className="mt-1 text-sm text-stone-500">
             Sign in to view your catalog and pricing.

@@ -33,7 +33,8 @@ export default async function AdminProductsPage() {
         {products.length === 0 ? (
           <p className="px-6 py-8 text-sm text-stone-500">No products yet.</p>
         ) : (
-          <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[40rem] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-stone-500">
               <tr className="border-b border-stone-200">
                 <th className="px-6 py-3">Name</th>
@@ -79,7 +80,7 @@ export default async function AdminProductsPage() {
                       />
                       <button
                         type="submit"
-                        className="font-medium text-amber-700 hover:underline"
+                        className="font-medium text-brand-700 hover:underline"
                       >
                         {p.is_active ? "Deactivate" : "Activate"}
                       </button>
@@ -89,6 +90,7 @@ export default async function AdminProductsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
     </div>
