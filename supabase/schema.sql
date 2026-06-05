@@ -21,15 +21,38 @@ create table if not exists public.customers (
 );
 
 -- Products: the catalog. base_price applies unless a customer override exists.
+-- name/description/unit/base_price are customer-facing; sku + the report_*/
+-- bake_time/product_type fields are internal (reporting, managed via CSV import).
 create table if not exists public.products (
-  id          uuid primary key default gen_random_uuid(),
-  name        text not null,
-  description text,
-  unit        text not null default 'dozen',
-  base_price  numeric(10,2) not null check (base_price >= 0),
-  is_active   boolean not null default true,
-  created_at  timestamptz not null default now()
+  id            uuid primary key default gen_random_uuid(),
+  name          text not null,
+  description   text,
+  unit          text not null default 'dozen',
+  base_price    numeric(10,2) not null check (base_price >= 0),
+  is_active     boolean not null default true,
+  sku           text,
+  bake_time     text,
+  product_type  text,
+  report_group  text,
+  report_unit   text,
+  report_count  integer,
+  sort_order    integer,
+  created_at    timestamptz not null default now()
 );
+
+-- Backfill the internal columns on databases created before they existed.
+-- (No-ops on a fresh install where the create table above already added them.)
+alter table public.products add column if not exists sku          text;
+alter table public.products add column if not exists bake_time    text;
+alter table public.products add column if not exists product_type text;
+alter table public.products add column if not exists report_group text;
+alter table public.products add column if not exists report_unit  text;
+alter table public.products add column if not exists report_count integer;
+alter table public.products add column if not exists sort_order   integer;
+
+-- SKU is the unique product key (nullable: UI-created products may lack one;
+-- Postgres treats NULLs as distinct, so multiple null-SKU rows are allowed).
+create unique index if not exists products_sku_key on public.products (sku);
 
 -- Customer pricing: per-customer override of a product's price.
 create table if not exists public.customer_pricing (
