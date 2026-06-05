@@ -227,11 +227,22 @@ async function importCustomers() {
     console.log(`• customers: ${PATHS.customers} not found — skipping`);
     return;
   }
-  const emails = new Set(
+  const { data: custRows, error: cErr } = await admin
+    .from("customers")
+    .select("id,email");
+  if (cErr) return console.error("  ! reading customers:", cErr.message);
+  const custByEmail = new Map(
+    (custRows ?? [])
+      .filter((c) => c.email)
+      .map((c) => [c.email.toLowerCase(), c.id]),
+  );
+  const authEmails = new Set(
     (await listAllUsers()).map((u) => (u.email ?? "").toLowerCase()),
   );
 
   const created = [];
+  const seen = new Set();
+  let updated = 0;
   let skipped = 0;
   let bad = 0;
   for (const [idx, r] of rows.entries()) {
@@ -239,16 +250,57 @@ async function importCustomers() {
     const business = r.business_name;
     const email = (r.email ?? "").toLowerCase();
     if (!business || !email) {
+      console.error(`  ! row ${line}: missing business_name or email — skipped`);
+      bad++;
+      continue;
+    }
+    if (seen.has(email)) {
       console.error(
-        `  ! row ${line}: missing business_name or email — skipped`,
+        `  ! row ${line}: duplicate email "${email}" in file — skipped`,
       );
       bad++;
       continue;
     }
-    if (emails.has(email)) {
+    seen.add(email);
+
+    const fields = {
+      business_name: business,
+      contact_name: r.contact_name || null,
+      email,
+      phone: r.phone || null,
+      address: r.address || null,
+      sales_rep: r.sales_rep || null,
+      tier: r.tier || null,
+      notes: r.notes || null,
+    };
+
+    // Existing customer → update profile, leave login + password untouched.
+    if (custByEmail.has(email)) {
+      if (!DRY) {
+        const { error: e } = await admin
+          .from("customers")
+          .update(fields)
+          .eq("id", custByEmail.get(email));
+        if (e) {
+          console.error(`  ! row ${line} (${business}): ${e.message}`);
+          bad++;
+          continue;
+        }
+      }
+      updated++;
+      continue;
+    }
+
+    // Email is already a non-customer login (e.g. an admin) → leave it alone.
+    if (authEmails.has(email)) {
+      console.error(
+        `  ! row ${line} (${business}): ${email} is already a non-customer login — skipped`,
+      );
       skipped++;
       continue;
     }
+
+    // New customer → create login + profile.
     const password = r.temp_password || genPassword();
     if (password.length < 8) {
       console.error(
@@ -270,14 +322,9 @@ async function importCustomers() {
         bad++;
         continue;
       }
-      const { error: ie } = await admin.from("customers").insert({
-        user_id: u.user.id,
-        business_name: business,
-        contact_name: r.contact_name || null,
-        email,
-        phone: r.phone || null,
-        address: r.address || null,
-      });
+      const { error: ie } = await admin
+        .from("customers")
+        .insert({ user_id: u.user.id, ...fields });
       if (ie) {
         await admin.auth.admin.deleteUser(u.user.id); // roll back orphan login
         console.error(`  ! row ${line} (${business}): ${ie.message}`);
@@ -285,11 +332,14 @@ async function importCustomers() {
         continue;
       }
     }
-    emails.add(email);
-    created.push({ business, email, password: DRY ? "(generated on run)" : password });
+    created.push({
+      business,
+      email,
+      password: DRY ? "(generated on run)" : password,
+    });
   }
   console.log(
-    `✓ customers: ${created.length} ${DRY ? "to create" : "created"}, ${skipped} skipped (exist), ${bad} errors`,
+    `✓ customers: ${created.length} ${DRY ? "to create" : "created"}, ${updated} ${DRY ? "to update" : "updated"}, ${skipped} skipped, ${bad} errors`,
   );
   if (created.length) {
     console.log("\n  Credentials to share with customers:");

@@ -8,7 +8,11 @@ const initialState: ActionState = { error: null, success: null };
 const inputClass =
   "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200";
 
-export function CreateProductForm() {
+export function CreateProductForm({
+  products,
+}: {
+  products: { id: string; name: string }[];
+}) {
   const [state, formAction, pending] = useActionState(
     createProduct,
     initialState,
@@ -25,9 +29,19 @@ export function CreateProductForm() {
       action={formAction}
       className="grid grid-cols-1 gap-4 sm:grid-cols-2"
     >
-      <div className="flex flex-col gap-1.5 sm:col-span-2">
+      <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-stone-700">Name *</label>
         <input name="name" required className={inputClass} />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-stone-700">SKU *</label>
+        <input
+          name="sku"
+          required
+          placeholder="e.g. Bulk_Everything"
+          className={inputClass}
+        />
       </div>
 
       <div className="flex flex-col gap-1.5 sm:col-span-2">
@@ -40,8 +54,8 @@ export function CreateProductForm() {
         <input
           name="unit"
           defaultValue="dozen"
-          className={inputClass}
           placeholder="dozen"
+          className={inputClass}
         />
       </div>
 
@@ -55,6 +69,59 @@ export function CreateProductForm() {
           step="0.01"
           min="0"
           required
+          className={inputClass}
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5 sm:col-span-2">
+        <label className="text-sm font-medium text-stone-700">
+          Position in catalog
+        </label>
+        <select name="position" defaultValue="end" className={inputClass}>
+          <option value="end">At the end</option>
+          <option value="start">At the beginning</option>
+          {products.map((p) => (
+            <option key={p.id} value={p.id}>
+              After: {p.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mt-2 border-t border-stone-200 pt-4 sm:col-span-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-stone-400">
+          Internal / reporting (optional)
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-stone-700">Bake time</label>
+        <input name="bake_time" placeholder="e.g. Late" className={inputClass} />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-stone-700">Product type</label>
+        <input name="product_type" placeholder="e.g. EVT" className={inputClass} />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-stone-700">Report group</label>
+        <input name="report_group" placeholder="e.g. bagels" className={inputClass} />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-stone-700">Report unit</label>
+        <input
+          name="report_unit"
+          placeholder="e.g. each_bagel"
+          className={inputClass}
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-stone-700">Report count</label>
+        <input
+          name="report_count"
+          type="number"
+          min="0"
+          step="1"
+          placeholder="e.g. 12"
           className={inputClass}
         />
       </div>
