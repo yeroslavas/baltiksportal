@@ -34,6 +34,10 @@ yarn-error.log*
 .env*
 !.env.example
 
+# bulk-import data — real customer info stays local; templates are kept
+/data/*.csv
+!/data/*.example.csv
+
 # windows / google drive cruft
 desktop.ini
 

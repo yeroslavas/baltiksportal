@@ -18,6 +18,14 @@ export type Product = {
   unit: string;
   base_price: number;
   is_active: boolean;
+  // Internal / reporting fields (not customer-facing; managed via CSV import).
+  sku: string | null;
+  bake_time: string | null;
+  product_type: string | null;
+  report_group: string | null;
+  report_unit: string | null;
+  report_count: number | null;
+  sort_order: number | null;
   created_at: string;
 };
 

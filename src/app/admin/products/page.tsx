@@ -6,7 +6,11 @@ import { toggleProductActive } from "./actions";
 
 export default async function AdminProductsPage() {
   const admin = createAdminClient();
-  const { data } = await admin.from("products").select("*").order("name");
+  const { data } = await admin
+    .from("products")
+    .select("*")
+    .order("sort_order", { ascending: true, nullsFirst: false })
+    .order("name");
   const products = (data ?? []) as Product[];
 
   return (

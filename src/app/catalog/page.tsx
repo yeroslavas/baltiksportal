@@ -21,6 +21,7 @@ export default async function CatalogPage() {
   const { data: productsData } = await supabase
     .from("products")
     .select("*")
+    .order("sort_order", { ascending: true, nullsFirst: false })
     .order("name");
   const products = (productsData ?? []) as Product[];
 

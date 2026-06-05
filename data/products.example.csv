@@ -1,0 +1,3 @@
+sku,name,description,unit,bake_time,product_type,report_group,report_unit,report_count,base_price
+Bulk_Everything,Everything by the doz.,"Our award winning bagels, topped with garlic, onion, sesame seed, poppy seed and salt. Sold bulk in a bag by the dozen",doz.,Late,EVT,bagels,each_bagel,12,$17.99
+Bulk_Plain,Plain by the doz.,"Classic plain bagels, sold bulk in a bag by the dozen",doz.,Early,PLN,bagels,each_bagel,12,15.99

@@ -71,6 +71,35 @@ Open http://localhost:3000 and sign in.
 For now, on **Customers** click **Reset password** next to the customer, **Generate**
 a new temporary password (or type one), **Set password**, then pass it to them.
 
+## Bulk data import
+
+To load many products, customers, or prices at once, drop CSVs into `data/` and
+run the importer. It's safe to re-run — existing products (by name) and customers
+(by email) are skipped, and pricing is upserted.
+
+```powershell
+# preview without writing anything
+node --env-file=.env.local scripts/import-data.mjs --dry-run
+# real import
+node --env-file=.env.local scripts/import-data.mjs
+```
+
+Columns (a header row is required; matched by name, case-insensitive). Copy the
+`*.example.csv` templates in `data/` as a starting point:
+
+| File | Columns |
+| --- | --- |
+| `data/products.csv` | `name, description, unit, base_price` |
+| `data/customers.csv` | `business_name, contact_name, email, phone, address, temp_password` |
+| `data/pricing.csv` | `business_name, product_name, custom_price` |
+
+- Prices are plain USD numbers (e.g. `12.00`). **Quote** any field that contains
+  a comma (e.g. `"123 Main St, Springfield"`).
+- A blank `temp_password` is auto-generated and printed so you can share it.
+- Within a run, products and customers import before pricing (so pricing can
+  resolve names → ids). Your real `data/*.csv` files are gitignored; only the
+  templates are committed.
+
 ## Project layout
 
 ```
@@ -102,3 +131,4 @@ src/app/
 | `npm run build` | Production build (type-check + lint) |
 | `npm run start` | Run the production build |
 | `npm run lint` | ESLint |
+| `node --env-file=.env.local scripts/import-data.mjs [--dry-run]` | Bulk-import products/customers/pricing from `data/*.csv` |
