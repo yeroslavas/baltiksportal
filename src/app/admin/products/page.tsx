@@ -27,7 +27,9 @@ export default async function AdminProductsPage() {
 
       <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
         <h2 className="mb-4 font-semibold text-stone-900">New product</h2>
-        <CreateProductForm />
+        <CreateProductForm
+          products={products.map((p) => ({ id: p.id, name: p.name }))}
+        />
       </section>
 
       <section className="rounded-2xl border border-stone-200 bg-white shadow-sm">

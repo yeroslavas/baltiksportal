@@ -8,6 +8,10 @@ export type Customer = {
   email: string | null;
   phone: string | null;
   address: string | null;
+  // Internal/admin fields (not shown to the customer; managed via CSV import).
+  sales_rep: string | null;
+  tier: string | null;
+  notes: string | null;
   created_at: string;
 };
 

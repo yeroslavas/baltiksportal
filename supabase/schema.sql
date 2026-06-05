@@ -17,8 +17,16 @@ create table if not exists public.customers (
   email         text,
   phone         text,
   address       text,
+  sales_rep     text,
+  tier          text,
+  notes         text,
   created_at    timestamptz not null default now()
 );
+
+-- Backfill internal customer columns on pre-existing databases (no-op on fresh).
+alter table public.customers add column if not exists sales_rep text;
+alter table public.customers add column if not exists tier      text;
+alter table public.customers add column if not exists notes     text;
 
 -- Products: the catalog. base_price applies unless a customer override exists.
 -- name/description/unit/base_price are customer-facing; sku + the report_*/
@@ -36,7 +44,7 @@ create table if not exists public.products (
   report_group  text,
   report_unit   text,
   report_count  integer,
-  sort_order    integer,
+  sort_order    numeric,
   created_at    timestamptz not null default now()
 );
 
@@ -48,7 +56,10 @@ alter table public.products add column if not exists product_type text;
 alter table public.products add column if not exists report_group text;
 alter table public.products add column if not exists report_unit  text;
 alter table public.products add column if not exists report_count integer;
-alter table public.products add column if not exists sort_order   integer;
+alter table public.products add column if not exists sort_order   numeric;
+-- sort_order is numeric so new products can be inserted between two existing
+-- ones (e.g. 5.5 between 5 and 6) without renumbering the rest.
+alter table public.products alter column sort_order type numeric;
 
 -- SKU is the unique product key (nullable: UI-created products may lack one;
 -- Postgres treats NULLs as distinct, so multiple null-SKU rows are allowed).

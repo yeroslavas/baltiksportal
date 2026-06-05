@@ -89,9 +89,15 @@ Columns (a header row is required; matched by name, case-insensitive). Copy the
 
 | File | Columns |
 | --- | --- |
-| `data/products.csv` | `name, description, unit, base_price` |
-| `data/customers.csv` | `business_name, contact_name, email, phone, address, temp_password` |
+| `data/products.csv` | `sku, name, description, unit, base_price, bake_time, product_type, report_group, report_unit, report_count` |
+| `data/customers.csv` | `business_name, contact_name, email, phone, address, sales_rep, tier, notes, temp_password` |
 | `data/pricing.csv` | `business_name, product_name, custom_price` |
+
+For **products**, `sku` is required and is the unique key (re-import updates the
+matching product); `name`/`description`/`unit`/`base_price` are customer-facing
+and the rest are internal/reporting. Catalog order follows the product **row
+order** in the file. For **customers**, re-import updates an existing account's
+profile (matched by email) without changing its login or password.
 
 - Prices are plain USD numbers (e.g. `12.00`). **Quote** any field that contains
   a comma (e.g. `"123 Main St, Springfield"`).

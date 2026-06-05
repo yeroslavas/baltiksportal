@@ -1,3 +1,3 @@
-business_name,contact_name,email,phone,address,temp_password
-Corner Cafe,Jamie Rivera,orders@cornercafe.com,555-0101,"123 Main St, Springfield",
-Sunrise Diner,Pat Lee,pat@sunrisediner.com,555-0102,"45 Oak Ave, Springfield",ChangeMe123
+business_name,contact_name,email,phone,address,sales_rep,tier,notes,temp_password
+Sodexo - Hunton Andrews Kurth,Christopher Bak,chris.bak@example.com,8045551234,"951 E Byrd St, Richmond, VA 23219",Stan Forsack,Strategic,Every other week,
+Corner Cafe,Jamie Rivera,orders@cornercafe.example.com,5550101,"123 Main St, Springfield",Pat Sales,Standard,Weekly delivery,
