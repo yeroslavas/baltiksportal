@@ -358,34 +358,64 @@ async function importPricing() {
     return;
   }
   const [{ data: custs }, { data: prods }] = await Promise.all([
-    admin.from("customers").select("id,business_name"),
-    admin.from("products").select("id,name"),
+    admin.from("customers").select("id,business_name,email"),
+    admin.from("products").select("id,name,sku"),
   ]);
+  // Customers match by email (stable) first, business_name as fallback.
+  const custByEmail = new Map(
+    (custs ?? [])
+      .filter((c) => c.email)
+      .map((c) => [c.email.toLowerCase(), c.id]),
+  );
   const custByName = new Map(
     (custs ?? []).map((c) => [c.business_name.trim().toLowerCase(), c.id]),
+  );
+  // Products match by SKU (stable, rename-proof) first, name as fallback.
+  const prodBySku = new Map(
+    (prods ?? [])
+      .filter((p) => p.sku)
+      .map((p) => [p.sku.trim().toLowerCase(), p.id]),
   );
   const prodByName = new Map(
     (prods ?? []).map((p) => [p.name.trim().toLowerCase(), p.id]),
   );
 
   const toUpsert = [];
+  const seen = new Set();
   let bad = 0;
   for (const [idx, r] of rows.entries()) {
     const line = idx + 2;
-    const cid = custByName.get((r.business_name ?? "").toLowerCase());
-    const pid = prodByName.get((r.product_name ?? "").toLowerCase());
+
+    let cid, clabel;
+    if (r.email) {
+      cid = custByEmail.get(r.email.toLowerCase());
+      clabel = `email "${r.email}"`;
+    }
+    if (!cid && r.business_name) {
+      cid = custByName.get(r.business_name.toLowerCase());
+      clabel = `customer "${r.business_name}"`;
+    }
+    if (!clabel) clabel = "customer (need an email or business_name column)";
+
+    let pid, plabel;
+    if (r.sku) {
+      pid = prodBySku.get(r.sku.toLowerCase());
+      plabel = `SKU "${r.sku}"`;
+    }
+    if (!pid && r.product_name) {
+      pid = prodByName.get(r.product_name.toLowerCase());
+      plabel = `product "${r.product_name}"`;
+    }
+    if (!plabel) plabel = "product (need a sku or product_name column)";
+
     const price = parseMoney(r.custom_price);
     if (!cid) {
-      console.error(
-        `  ! row ${line}: unknown customer "${r.business_name}" — skipped`,
-      );
+      console.error(`  ! row ${line}: unknown ${clabel} — skipped`);
       bad++;
       continue;
     }
     if (!pid) {
-      console.error(
-        `  ! row ${line}: unknown product "${r.product_name}" — skipped`,
-      );
+      console.error(`  ! row ${line}: unknown ${plabel} — skipped`);
       bad++;
       continue;
     }
@@ -396,6 +426,17 @@ async function importPricing() {
       bad++;
       continue;
     }
+
+    const key = `${cid}|${pid}`;
+    if (seen.has(key)) {
+      console.error(
+        `  ! row ${line}: duplicate ${clabel} + ${plabel} in file — skipped`,
+      );
+      bad++;
+      continue;
+    }
+    seen.add(key);
+
     toUpsert.push({ customer_id: cid, product_id: pid, custom_price: price });
   }
 
