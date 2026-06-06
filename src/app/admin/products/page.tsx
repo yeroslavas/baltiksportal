@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice } from "@/lib/format";
 import type { Product } from "@/lib/types";
@@ -77,20 +78,28 @@ export default async function AdminProductsPage() {
                     )}
                   </td>
                   <td className="px-6 py-3 text-right">
-                    <form action={toggleProductActive}>
-                      <input type="hidden" name="id" value={p.id} />
-                      <input
-                        type="hidden"
-                        name="is_active"
-                        value={String(p.is_active)}
-                      />
-                      <button
-                        type="submit"
+                    <div className="flex items-center justify-end gap-4">
+                      <Link
+                        href={`/admin/products/${p.id}/edit`}
                         className="font-medium text-brand-700 hover:underline"
                       >
-                        {p.is_active ? "Deactivate" : "Activate"}
-                      </button>
-                    </form>
+                        Edit
+                      </Link>
+                      <form action={toggleProductActive}>
+                        <input type="hidden" name="id" value={p.id} />
+                        <input
+                          type="hidden"
+                          name="is_active"
+                          value={String(p.is_active)}
+                        />
+                        <button
+                          type="submit"
+                          className="font-medium text-stone-500 hover:text-stone-700 hover:underline"
+                        >
+                          {p.is_active ? "Deactivate" : "Activate"}
+                        </button>
+                      </form>
+                    </div>
                   </td>
                 </tr>
               ))}
