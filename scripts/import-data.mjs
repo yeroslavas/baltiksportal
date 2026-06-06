@@ -382,9 +382,18 @@ async function importPricing() {
 
   const toUpsert = [];
   const seen = new Set();
+  let blanks = 0;
   let bad = 0;
   for (const [idx, r] of rows.entries()) {
     const line = idx + 2;
+    const rawPrice = (r.custom_price ?? "").trim();
+
+    // Blank price = no override; the customer simply sees the base price.
+    // (An explicit 0 is kept as a real $0 price.)
+    if (rawPrice === "") {
+      blanks++;
+      continue;
+    }
 
     let cid, clabel;
     if (r.email) {
@@ -398,9 +407,10 @@ async function importPricing() {
     if (!clabel) clabel = "customer (need an email or business_name column)";
 
     let pid, plabel;
-    if (r.sku) {
-      pid = prodBySku.get(r.sku.toLowerCase());
-      plabel = `SKU "${r.sku}"`;
+    const skuVal = r.sku || r.product_sku; // accept "sku" or "product_sku"
+    if (skuVal) {
+      pid = prodBySku.get(skuVal.toLowerCase());
+      plabel = `SKU "${skuVal}"`;
     }
     if (!pid && r.product_name) {
       pid = prodByName.get(r.product_name.toLowerCase());
@@ -408,7 +418,7 @@ async function importPricing() {
     }
     if (!plabel) plabel = "product (need a sku or product_name column)";
 
-    const price = parseMoney(r.custom_price);
+    const price = parseMoney(rawPrice);
     if (!cid) {
       console.error(`  ! row ${line}: unknown ${clabel} — skipped`);
       bad++;
@@ -450,7 +460,7 @@ async function importPricing() {
     }
   }
   console.log(
-    `✓ pricing: ${toUpsert.length} ${DRY ? "to upsert" : "upserted"}, ${bad} errors`,
+    `✓ pricing: ${toUpsert.length} ${DRY ? "to upsert" : "upserted"}, ${blanks} blank → base price, ${bad} errors`,
   );
 }
 
