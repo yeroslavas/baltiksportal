@@ -129,11 +129,6 @@ export default async function CatalogPage() {
                     </p>
                     <p className="text-xs text-stone-500">per {item.unit}</p>
                   </div>
-                  {item.has_custom_price ? (
-                    <span className="rounded-full bg-peach px-2.5 py-1 text-xs font-medium text-brand-800">
-                      Your price
-                    </span>
-                  ) : null}
                 </div>
               </li>
             ))}
