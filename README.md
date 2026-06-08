@@ -111,6 +111,20 @@ re-import. Re-importing a row updates that customer's price for that product.
   resolve names → ids). Your real `data/*.csv` files are gitignored; only the
   templates are committed.
 
+## Product photos
+
+One image per product, shown on the catalog cards (with a placeholder when a
+product has no photo). Images live in a public Supabase Storage bucket
+(`product-images`). To add/replace them in bulk:
+
+1. Put one image per product in `data/images/`, **named by the product's SKU** —
+   e.g. `data/images/Bulk_Everything.jpg` (`.jpg`, `.png`, or `.webp`).
+2. Run `node --env-file=.env.local scripts/import-images.mjs`. It creates the
+   bucket if needed, uploads each file, and sets the product's `image_url`.
+
+Re-running replaces an image (upload is upsert). The `data/images/` folder is
+gitignored — the canonical copies live in Storage.
+
 ## Project layout
 
 ```
@@ -143,3 +157,4 @@ src/app/
 | `npm run start` | Run the production build |
 | `npm run lint` | ESLint |
 | `node --env-file=.env.local scripts/import-data.mjs [--dry-run]` | Bulk-import products/customers/pricing from `data/*.csv` |
+| `node --env-file=.env.local scripts/import-images.mjs` | Upload product photos from `data/images/<sku>.{jpg,png,webp}` to Supabase Storage |

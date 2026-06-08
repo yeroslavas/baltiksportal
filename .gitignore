@@ -38,6 +38,9 @@ yarn-error.log*
 /data/*.csv
 !/data/*.example.csv
 
+# product photo staging — the real copies live in Supabase Storage
+/data/images/
+
 # windows / google drive cruft
 desktop.ini
 

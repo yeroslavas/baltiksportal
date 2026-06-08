@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Image from "next/image";
 import { updateProduct, type ActionState } from "../../actions";
 import type { Product } from "@/lib/types";
 
@@ -55,6 +56,30 @@ export function EditProductForm({
           defaultValue={product.description ?? ""}
           className={inputClass}
         />
+      </div>
+
+      <div className="flex flex-col gap-1.5 sm:col-span-2">
+        <label className="text-sm font-medium text-stone-700">Product photo</label>
+        {product.image_url ? (
+          <Image
+            src={product.image_url}
+            alt=""
+            width={160}
+            height={120}
+            className="h-24 w-32 rounded-lg border border-stone-200 object-cover"
+          />
+        ) : (
+          <p className="text-xs text-stone-400">No photo yet.</p>
+        )}
+        <input
+          type="file"
+          name="image"
+          accept="image/jpeg,image/png,image/webp"
+          className="text-sm text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-600 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-brand-700"
+        />
+        <p className="text-xs text-stone-500">
+          JPG, PNG, or WebP, up to 4MB. Uploading replaces the current photo.
+        </p>
       </div>
 
       <div className="flex flex-col gap-1.5">

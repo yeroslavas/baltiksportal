@@ -38,6 +38,7 @@ create table if not exists public.products (
   unit          text not null default 'dozen',
   base_price    numeric(10,2) not null check (base_price >= 0),
   is_active     boolean not null default true,
+  image_url     text,
   sku           text,
   bake_time     text,
   product_type  text,
@@ -57,6 +58,7 @@ alter table public.products add column if not exists report_group text;
 alter table public.products add column if not exists report_unit  text;
 alter table public.products add column if not exists report_count integer;
 alter table public.products add column if not exists sort_order   numeric;
+alter table public.products add column if not exists image_url    text;
 -- sort_order is numeric so new products can be inserted between two existing
 -- ones (e.g. 5.5 between 5 and 6) without renumbering the rest.
 alter table public.products alter column sort_order type numeric;
@@ -132,5 +134,5 @@ grant select (id, user_id, business_name, contact_name, email, phone, address, c
 
 -- products: hide sku, bake_time, product_type, report_* (internal/reporting).
 revoke select on public.products from anon, authenticated;
-grant select (id, name, description, unit, base_price, is_active, sort_order, created_at)
+grant select (id, name, description, unit, base_price, is_active, sort_order, image_url, created_at)
   on public.products to anon, authenticated;
