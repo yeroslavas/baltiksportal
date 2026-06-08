@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState, type ChangeEvent } from "react";
 import Image from "next/image";
 import { updateProduct, type ActionState } from "../../actions";
 import type { Product } from "@/lib/types";
@@ -21,6 +21,19 @@ export function EditProductForm({
     updateProduct,
     initialState,
   );
+  const [fileError, setFileError] = useState<string | null>(null);
+
+  const onPhotoChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f && f.size > 2 * 1024 * 1024) {
+      setFileError(
+        `That photo is ${(f.size / 1024 / 1024).toFixed(1)}MB — please use one under 2MB (try compressing or exporting it smaller).`,
+      );
+      e.target.value = ""; // clear it so it can't be submitted
+    } else {
+      setFileError(null);
+    }
+  };
 
   return (
     <form
@@ -75,11 +88,16 @@ export function EditProductForm({
           type="file"
           name="image"
           accept="image/jpeg,image/png,image/webp"
+          onChange={onPhotoChange}
           className="text-sm text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-600 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-brand-700"
         />
-        <p className="text-xs text-stone-500">
-          JPG, PNG, or WebP, up to 4MB. Uploading replaces the current photo.
-        </p>
+        {fileError ? (
+          <p className="text-xs font-medium text-red-700">{fileError}</p>
+        ) : (
+          <p className="text-xs text-stone-500">
+            JPG, PNG, or WebP, up to 2MB. Uploading replaces the current photo.
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5">

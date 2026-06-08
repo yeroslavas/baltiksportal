@@ -31,7 +31,7 @@ const IMAGE_EXT: Record<string, string> = {
   "image/png": "png",
   "image/webp": "webp",
 };
-const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
 // Upload a product photo to Storage and return its public URL. The caller passes
 // a non-empty File and a storage key (the product's SKU, id as fallback).
@@ -43,7 +43,7 @@ async function uploadProductImage(
   const ext = IMAGE_EXT[file.type];
   if (!ext) return { error: "Photo must be a JPG, PNG, or WebP." };
   if (file.size > MAX_IMAGE_BYTES) {
-    return { error: "Photo must be 4MB or smaller." };
+    return { error: "Photo must be 2MB or smaller." };
   }
 
   const { error: bucketErr } = await admin.storage.createBucket(IMAGE_BUCKET, {

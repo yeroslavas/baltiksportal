@@ -32,8 +32,9 @@ const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
 
 const nextConfig: NextConfig = {
   experimental: {
-    // Product-photo uploads go through a server action; lift the default 1MB cap.
-    serverActions: { bodySizeLimit: "5mb" },
+    // Product-photo uploads go through a server action; lift the default 1MB cap
+    // to allow a 2MB photo + form fields (the form blocks anything larger).
+    serverActions: { bodySizeLimit: "3mb" },
   },
   images: {
     remotePatterns: supabaseHost
