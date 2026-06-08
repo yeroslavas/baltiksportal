@@ -49,6 +49,21 @@ export function CreateProductForm({
         <input name="description" className={inputClass} />
       </div>
 
+      <div className="flex flex-col gap-1.5 sm:col-span-2">
+        <label className="text-sm font-medium text-stone-700">
+          Product photo
+        </label>
+        <input
+          type="file"
+          name="image"
+          accept="image/jpeg,image/png,image/webp"
+          className="text-sm text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-600 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-brand-700"
+        />
+        <p className="text-xs text-stone-500">
+          Optional. JPG, PNG, or WebP, up to 4MB.
+        </p>
+      </div>
+
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-stone-700">Unit</label>
         <input

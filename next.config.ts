@@ -24,7 +24,28 @@ const securityHeaders = [
   },
 ];
 
+// Allow next/image to optimize product photos served from Supabase Storage's
+// public bucket. Host is derived from the Supabase URL (available at build time).
+const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
+  : null;
+
 const nextConfig: NextConfig = {
+  experimental: {
+    // Product-photo uploads go through a server action; lift the default 1MB cap.
+    serverActions: { bodySizeLimit: "5mb" },
+  },
+  images: {
+    remotePatterns: supabaseHost
+      ? [
+          {
+            protocol: "https",
+            hostname: supabaseHost,
+            pathname: "/storage/v1/object/public/**",
+          },
+        ]
+      : [],
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

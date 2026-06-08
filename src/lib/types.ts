@@ -22,6 +22,7 @@ export type Product = {
   unit: string;
   base_price: number;
   is_active: boolean;
+  image_url: string | null;
   // Internal / reporting fields (not customer-facing; managed via CSV import).
   sku: string | null;
   bake_time: string | null;

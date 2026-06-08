@@ -23,7 +23,7 @@ export default async function CatalogPage() {
   // only (no sku/report_* — those are restricted from the API roles too).
   const { data: productsData } = await supabase
     .from("products")
-    .select("id, name, description, unit, base_price, sort_order")
+    .select("id, name, description, unit, base_price, sort_order, image_url")
     .order("sort_order", { ascending: true, nullsFirst: false })
     .order("name");
   const products = (productsData ?? []) as Product[];
@@ -112,22 +112,39 @@ export default async function CatalogPage() {
             {items.map((item) => (
               <li
                 key={item.id}
-                className="flex flex-col rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"
+                className="flex flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm"
               >
-                <div className="flex-1">
-                  <h2 className="font-semibold text-stone-900">{item.name}</h2>
-                  {item.description ? (
-                    <p className="mt-1 text-sm text-stone-500">
-                      {item.description}
-                    </p>
-                  ) : null}
+                <div className="relative aspect-[4/3] w-full bg-stone-100">
+                  {item.image_url ? (
+                    <Image
+                      src={item.image_url}
+                      alt={item.name}
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-4xl">
+                      🥯
+                    </div>
+                  )}
                 </div>
-                <div className="mt-4 flex items-end justify-between">
-                  <div>
-                    <p className="text-xl font-bold text-stone-900">
-                      {formatPrice(item.effective_price)}
-                    </p>
-                    <p className="text-xs text-stone-500">per {item.unit}</p>
+                <div className="flex flex-1 flex-col p-5">
+                  <div className="flex-1">
+                    <h2 className="font-semibold text-stone-900">{item.name}</h2>
+                    {item.description ? (
+                      <p className="mt-1 text-sm text-stone-500">
+                        {item.description}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="mt-4 flex items-end justify-between">
+                    <div>
+                      <p className="text-xl font-bold text-stone-900">
+                        {formatPrice(item.effective_price)}
+                      </p>
+                      <p className="text-xs text-stone-500">per {item.unit}</p>
+                    </div>
                   </div>
                 </div>
               </li>

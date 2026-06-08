@@ -25,6 +25,45 @@ function computeSortOrder(position: string, rows: OrderRow[]): number {
   return after.length ? (base + Math.min(...after)) / 2 : base + 1;
 }
 
+const IMAGE_BUCKET = "product-images";
+const IMAGE_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
+// Upload a product photo to Storage and return its public URL. The caller passes
+// a non-empty File and a storage key (the product's SKU, id as fallback).
+async function uploadProductImage(
+  admin: ReturnType<typeof createAdminClient>,
+  key: string,
+  file: File,
+): Promise<{ url?: string; error?: string }> {
+  const ext = IMAGE_EXT[file.type];
+  if (!ext) return { error: "Photo must be a JPG, PNG, or WebP." };
+  if (file.size > MAX_IMAGE_BYTES) {
+    return { error: "Photo must be 4MB or smaller." };
+  }
+
+  const { error: bucketErr } = await admin.storage.createBucket(IMAGE_BUCKET, {
+    public: true,
+  });
+  if (bucketErr && !/already exists/i.test(bucketErr.message)) {
+    return { error: bucketErr.message };
+  }
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const path = `${key}.${ext}`;
+  const { error: upErr } = await admin.storage
+    .from(IMAGE_BUCKET)
+    .upload(path, bytes, { contentType: file.type, upsert: true });
+  if (upErr) return { error: upErr.message };
+
+  const { data: pub } = admin.storage.from(IMAGE_BUCKET).getPublicUrl(path);
+  return { url: `${pub.publicUrl}?v=${bytes.length}` }; // cache-bust on replace
+}
+
 export async function createProduct(
   _prevState: ActionState,
   formData: FormData,
@@ -72,6 +111,14 @@ export async function createProduct(
   const { data: rows } = await admin.from("products").select("id,sort_order");
   const sortOrder = computeSortOrder(position, rows ?? []);
 
+  let imageUrl: string | null = null;
+  const imageFile = formData.get("image");
+  if (imageFile instanceof File && imageFile.size > 0) {
+    const img = await uploadProductImage(admin, sku, imageFile);
+    if (img.error) return { error: img.error, success: null };
+    imageUrl = img.url ?? null;
+  }
+
   const { error } = await admin.from("products").insert({
     sku,
     name,
@@ -84,6 +131,7 @@ export async function createProduct(
     report_unit: get("report_unit") || null,
     report_count: reportCount,
     sort_order: sortOrder,
+    image_url: imageUrl,
     is_active: true,
   });
 
@@ -151,6 +199,19 @@ export async function updateProduct(
       .select("id,sort_order")
       .neq("id", id);
     update.sort_order = computeSortOrder(position, rows ?? []);
+  }
+
+  // Photo (optional) — replace the product's image if one was uploaded.
+  const imageFile = formData.get("image");
+  if (imageFile instanceof File && imageFile.size > 0) {
+    const { data: prod } = await admin
+      .from("products")
+      .select("sku")
+      .eq("id", id)
+      .maybeSingle<{ sku: string | null }>();
+    const img = await uploadProductImage(admin, prod?.sku || id, imageFile);
+    if (img.error) return { error: img.error, success: null };
+    if (img.url) update.image_url = img.url;
   }
 
   const { error } = await admin.from("products").update(update).eq("id", id);
