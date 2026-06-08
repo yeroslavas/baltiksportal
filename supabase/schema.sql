@@ -114,3 +114,23 @@ create policy "read own pricing"
       select id from public.customers where user_id = (select auth.uid())
     )
   );
+
+-- ----------------------------------------------------------------------------
+-- Column-level hardening
+--
+-- RLS above restricts which ROWS a signed-in customer can read. These grants
+-- restrict which COLUMNS — so internal fields can't be read via the REST API
+-- even on a row the customer owns. We revoke table-wide SELECT from the API
+-- roles and re-grant only the customer-facing columns. The service_role (admin
+-- app + importer) bypasses this and keeps full access.
+-- ----------------------------------------------------------------------------
+
+-- customers: hide sales_rep, tier, notes (internal admin fields).
+revoke select on public.customers from anon, authenticated;
+grant select (id, user_id, business_name, contact_name, email, phone, address, created_at)
+  on public.customers to anon, authenticated;
+
+-- products: hide sku, bake_time, product_type, report_* (internal/reporting).
+revoke select on public.products from anon, authenticated;
+grant select (id, name, description, unit, base_price, is_active, sort_order, created_at)
+  on public.products to anon, authenticated;

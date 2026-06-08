@@ -11,16 +11,19 @@ export default async function CatalogPage() {
   const supabase = await createClient();
 
   // Resolve this user's customer record (RLS limits this to their own row).
+  // Only the customer-facing columns — internal fields (sales_rep/tier/notes)
+  // aren't selected, and the API roles can't read them either (see schema.sql).
   const { data: customer } = await supabase
     .from("customers")
-    .select("*")
+    .select("id, business_name")
     .eq("user_id", user.id)
-    .maybeSingle<Customer>();
+    .maybeSingle<Pick<Customer, "id" | "business_name">>();
 
-  // Active catalog + this customer's price overrides.
+  // Active catalog + this customer's price overrides. Customer-facing columns
+  // only (no sku/report_* — those are restricted from the API roles too).
   const { data: productsData } = await supabase
     .from("products")
-    .select("*")
+    .select("id, name, description, unit, base_price, sort_order")
     .order("sort_order", { ascending: true, nullsFirst: false })
     .order("name");
   const products = (productsData ?? []) as Product[];
