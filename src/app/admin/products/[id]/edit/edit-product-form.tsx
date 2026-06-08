@@ -34,8 +34,18 @@ export function EditProductForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-stone-700">SKU *</label>
-        <input name="sku" required defaultValue={product.sku ?? ""} className={inputClass} />
+        <label className="text-sm font-medium text-stone-700">SKU</label>
+        <input
+          defaultValue={product.sku ?? "—"}
+          readOnly
+          tabIndex={-1}
+          className={`${inputClass} cursor-not-allowed bg-stone-100 text-stone-500`}
+        />
+        <p className="text-xs text-stone-500">
+          Locked — the stable key that links this product to pricing &amp; CSV
+          imports. (Need to change it? It ripples to those files, so ask and
+          we&apos;ll do it carefully.)
+        </p>
       </div>
 
       <div className="flex flex-col gap-1.5 sm:col-span-2">
