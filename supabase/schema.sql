@@ -136,3 +136,70 @@ grant select (id, user_id, business_name, contact_name, email, phone, address, c
 revoke select on public.products from anon, authenticated;
 grant select (id, name, description, unit, base_price, is_active, sort_order, image_url, created_at)
   on public.products to anon, authenticated;
+
+-- ----------------------------------------------------------------------------
+-- Phase 2: Orders
+--
+-- order_items snapshot product_name + unit_price at order time, so history is
+-- immutable even if a product is renamed, repriced, or deleted. Orders are
+-- created and their status updated SERVER-SIDE with the service_role key
+-- (prices recomputed there, never trusted from the client), so there are no
+-- insert/update RLS policies — only read-own-orders.
+-- ----------------------------------------------------------------------------
+
+create table if not exists public.orders (
+  id            uuid primary key default gen_random_uuid(),
+  order_number  bigint generated always as identity (start with 1000),
+  customer_id   uuid not null references public.customers (id) on delete cascade,
+  order_date    timestamptz not null default now(),
+  status        text not null default 'pending'
+                  check (status in ('pending', 'processing', 'fulfilled')),
+  total_amount  numeric(10,2) not null default 0 check (total_amount >= 0),
+  created_at    timestamptz not null default now()
+);
+
+create table if not exists public.order_items (
+  id           uuid primary key default gen_random_uuid(),
+  order_id     uuid not null references public.orders (id) on delete cascade,
+  product_id   uuid references public.products (id) on delete set null,
+  product_name text not null,
+  quantity     integer not null check (quantity > 0),
+  unit_price   numeric(10,2) not null check (unit_price >= 0),
+  line_total   numeric(10,2) not null check (line_total >= 0),
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists idx_orders_customer  on public.orders (customer_id);
+create index if not exists idx_orders_date       on public.orders (order_date desc);
+create index if not exists idx_order_items_order on public.order_items (order_id);
+
+alter table public.orders      enable row level security;
+alter table public.order_items enable row level security;
+
+grant select on public.orders      to authenticated;
+grant select on public.order_items to authenticated;
+
+-- A customer can read only their own orders.
+drop policy if exists "read own orders" on public.orders;
+create policy "read own orders"
+  on public.orders for select
+  to authenticated
+  using (
+    customer_id in (
+      select id from public.customers where user_id = (select auth.uid())
+    )
+  );
+
+-- A customer can read only the items of their own orders.
+drop policy if exists "read own order items" on public.order_items;
+create policy "read own order items"
+  on public.order_items for select
+  to authenticated
+  using (
+    order_id in (
+      select o.id
+      from public.orders o
+      join public.customers c on c.id = o.customer_id
+      where c.user_id = (select auth.uid())
+    )
+  );
