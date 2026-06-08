@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { createProduct, type ActionState } from "./actions";
 
 const initialState: ActionState = { error: null, success: null };
@@ -22,6 +22,19 @@ export function CreateProductForm({
   useEffect(() => {
     if (state.success) formRef.current?.reset();
   }, [state.success]);
+
+  const [fileError, setFileError] = useState<string | null>(null);
+  const onPhotoChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f && f.size > 2 * 1024 * 1024) {
+      setFileError(
+        `That photo is ${(f.size / 1024 / 1024).toFixed(1)}MB — please use one under 2MB (try compressing or exporting it smaller).`,
+      );
+      e.target.value = ""; // clear it so it can't be submitted
+    } else {
+      setFileError(null);
+    }
+  };
 
   return (
     <form
@@ -57,11 +70,16 @@ export function CreateProductForm({
           type="file"
           name="image"
           accept="image/jpeg,image/png,image/webp"
+          onChange={onPhotoChange}
           className="text-sm text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-600 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-brand-700"
         />
-        <p className="text-xs text-stone-500">
-          Optional. JPG, PNG, or WebP, up to 4MB.
-        </p>
+        {fileError ? (
+          <p className="text-xs font-medium text-red-700">{fileError}</p>
+        ) : (
+          <p className="text-xs text-stone-500">
+            Optional. JPG, PNG, or WebP, up to 2MB.
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5">
