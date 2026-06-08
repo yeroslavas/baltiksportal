@@ -111,16 +111,12 @@ export async function updateProduct(
   if (!id) return { error: "Missing product id.", success: null };
 
   const name = get("name");
-  const sku = get("sku");
   const basePriceRaw = get("base_price");
   const basePrice = Number(basePriceRaw.replace(/[$,\s]/g, ""));
   const reportCountRaw = get("report_count");
   const position = get("position") || "keep"; // "keep" | "start" | "end" | id
 
   if (!name) return { error: "Product name is required.", success: null };
-  if (!sku) {
-    return { error: "SKU is required — it's the product's unique key.", success: null };
-  }
   if (!basePriceRaw || Number.isNaN(basePrice) || basePrice < 0) {
     return { error: "Enter a valid base price (0 or more).", success: null };
   }
@@ -134,19 +130,9 @@ export async function updateProduct(
 
   const admin = createAdminClient();
 
-  // SKU must stay unique — exclude this product from the check.
-  const { data: dup } = await admin
-    .from("products")
-    .select("id")
-    .eq("sku", sku)
-    .neq("id", id)
-    .limit(1);
-  if (dup && dup.length) {
-    return { error: `Another product already uses SKU "${sku}".`, success: null };
-  }
-
+  // SKU is intentionally NOT updated here — it's the stable key linking the
+  // product to pricing and CSV imports, so the edit form shows it read-only.
   const update: Record<string, unknown> = {
-    sku,
     name,
     description: get("description") || null,
     unit: get("unit") || "dozen",
@@ -168,12 +154,7 @@ export async function updateProduct(
   }
 
   const { error } = await admin.from("products").update(update).eq("id", id);
-  if (error) {
-    if (error.code === "23505") {
-      return { error: `Another product already uses SKU "${sku}".`, success: null };
-    }
-    return { error: error.message, success: null };
-  }
+  if (error) return { error: error.message, success: null };
 
   revalidatePath("/admin/products");
   revalidatePath("/admin");
