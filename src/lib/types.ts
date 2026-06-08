@@ -47,3 +47,32 @@ export type PricedProduct = Product & {
   effective_price: number;
   has_custom_price: boolean;
 };
+
+export type OrderStatus = "pending" | "processing" | "fulfilled";
+
+export const ORDER_STATUSES: OrderStatus[] = [
+  "pending",
+  "processing",
+  "fulfilled",
+];
+
+export type Order = {
+  id: string;
+  order_number: number;
+  customer_id: string;
+  order_date: string;
+  status: OrderStatus;
+  total_amount: number;
+  created_at: string;
+};
+
+export type OrderItem = {
+  id: string;
+  order_id: string;
+  product_id: string | null;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  created_at: string;
+};

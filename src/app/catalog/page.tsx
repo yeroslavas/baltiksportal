@@ -1,10 +1,10 @@
-import Link from "next/link";
 import Image from "next/image";
 import { requireUser, isAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice } from "@/lib/format";
-import { logout } from "@/app/login/actions";
 import type { Customer, Product, CustomerPricing, PricedProduct } from "@/lib/types";
+import { AddToCart } from "./add-to-cart";
+import { CustomerHeader } from "@/components/customer-header";
 
 export default async function CatalogPage() {
   const user = await requireUser();
@@ -52,46 +52,10 @@ export default async function CatalogPage() {
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="border-b border-stone-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <Image
-              src="/baltiks-logo.webp"
-              width={750}
-              height={375}
-              alt="Baltik's Bagel"
-              priority
-              className="h-9 w-auto shrink-0"
-            />
-            <div className="min-w-0 border-l border-stone-200 pl-3">
-              <p className="text-[10px] font-medium uppercase tracking-wide leading-tight text-stone-400">
-                Wholesale
-              </p>
-              <p className="truncate text-sm font-medium leading-tight text-stone-700">
-                {customer?.business_name ?? user.email}
-              </p>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-4">
-            {isAdmin(user.email) ? (
-              <Link
-                href="/admin"
-                className="text-sm font-medium text-brand-700 hover:underline"
-              >
-                Admin
-              </Link>
-            ) : null}
-            <form action={logout}>
-              <button
-                type="submit"
-                className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
-              >
-                Sign out
-              </button>
-            </form>
-          </div>
-        </div>
-      </header>
+      <CustomerHeader
+        label={customer?.business_name ?? user.email ?? ""}
+        isAdminUser={isAdmin(user.email)}
+      />
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
         <h1 className="text-2xl font-bold tracking-tight text-stone-900">
@@ -146,6 +110,12 @@ export default async function CatalogPage() {
                       <p className="text-xs text-stone-500">per {item.unit}</p>
                     </div>
                   </div>
+                  <AddToCart
+                    productId={item.id}
+                    name={item.name}
+                    unit={item.unit}
+                    unitPrice={item.effective_price}
+                  />
                 </div>
               </li>
             ))}

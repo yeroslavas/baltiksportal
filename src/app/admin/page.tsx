@@ -4,9 +4,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export default async function AdminDashboard() {
   const admin = createAdminClient();
 
-  const [{ count: customerCount }, { count: productCount }] = await Promise.all([
+  const [
+    { count: customerCount },
+    { count: productCount },
+    { count: orderCount },
+  ] = await Promise.all([
     admin.from("customers").select("*", { count: "exact", head: true }),
     admin.from("products").select("*", { count: "exact", head: true }),
+    admin.from("orders").select("*", { count: "exact", head: true }),
   ]);
 
   const cards = [
@@ -27,6 +32,12 @@ export default async function AdminDashboard() {
       title: "Pricing",
       value: "→",
       blurb: "Assign custom per-customer pricing.",
+    },
+    {
+      href: "/admin/orders",
+      title: "Orders",
+      value: orderCount ?? 0,
+      blurb: "View orders and update fulfillment status.",
     },
   ];
 
