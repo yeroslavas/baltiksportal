@@ -56,6 +56,16 @@ export const ORDER_STATUSES: OrderStatus[] = [
   "fulfilled",
 ];
 
+export type FulfillmentType = "delivery" | "pickup";
+
+// Delivery/pickup time windows (shown in checkout + validated server-side).
+export const DELIVERY_TIME_WINDOWS = [
+  "6:30–7:30 AM",
+  "7:30–8:30 AM",
+  "8:30–9:00 AM",
+  "9:00–10:00 AM",
+];
+
 export type Order = {
   id: string;
   order_number: number;
@@ -63,6 +73,9 @@ export type Order = {
   order_date: string;
   status: OrderStatus;
   total_amount: number;
+  fulfillment_type: FulfillmentType;
+  delivery_date: string | null;
+  delivery_time: string | null;
   created_at: string;
 };
 

@@ -57,7 +57,10 @@ export default async function OrdersPage() {
                       Order #{o.order_number}
                     </p>
                     <p className="text-xs text-stone-500">
-                      {formatDate(o.order_date)}
+                      Ordered {formatDate(o.order_date)}
+                      {o.delivery_date
+                        ? ` · ${o.fulfillment_type === "pickup" ? "Pickup" : "Delivery"} ${formatDate(o.delivery_date)}`
+                        : ""}
                     </p>
                   </div>
                   <div className="flex items-center gap-4">

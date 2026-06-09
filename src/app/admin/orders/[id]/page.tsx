@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice, formatDate } from "@/lib/format";
 import { OrderStatusForm } from "../order-status-form";
+import { FulfillmentInfo } from "@/components/fulfillment-info";
 import type { Order, OrderItem } from "@/lib/types";
 
 type OrderWithCustomer = Order & {
@@ -72,6 +73,8 @@ export default async function AdminOrderDetailPage({
           {formatDate(order.order_date)}
         </p>
       </div>
+
+      <FulfillmentInfo order={order} />
 
       <section className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm">
         <table className="w-full min-w-[36rem] text-left text-sm">
