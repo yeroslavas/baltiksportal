@@ -10,9 +10,13 @@ export default async function CheckoutPage() {
   const admin = createAdminClient();
   const { data: customer } = await admin
     .from("customers")
-    .select("business_name, waive_delivery_minimum")
+    .select("business_name, waive_delivery_minimum, delivery_window")
     .eq("user_id", user.id)
-    .maybeSingle<{ business_name: string; waive_delivery_minimum: boolean }>();
+    .maybeSingle<{
+      business_name: string;
+      waive_delivery_minimum: boolean;
+      delivery_window: string | null;
+    }>();
 
   return (
     <div className="flex flex-1 flex-col">
@@ -29,6 +33,7 @@ export default async function CheckoutPage() {
         </p>
         <CheckoutView
           waiveDeliveryMinimum={customer?.waive_delivery_minimum ?? false}
+          deliveryWindow={customer?.delivery_window ?? null}
         />
       </main>
     </div>

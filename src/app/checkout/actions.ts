@@ -2,14 +2,10 @@
 
 import { getUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  DELIVERY_TIME_WINDOWS,
-  DELIVERY_MINIMUM,
-  DELIVERY_FEE,
-} from "@/lib/types";
+import { DELIVERY_MINIMUM, DELIVERY_FEE } from "@/lib/types";
 
 type CartLine = { productId: string; quantity: number };
-type Fulfillment = { type: string; date: string; time: string };
+type Fulfillment = { type: string; date: string };
 type PlaceOrderResult =
   | { orderId: string; orderNumber: number; error?: undefined }
   | { error: string; orderId?: undefined; orderNumber?: undefined };
@@ -38,10 +34,6 @@ export async function placeOrder(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return { error: "Please choose a valid date." };
   }
-  const time = String(fulfillment?.time ?? "").trim();
-  if (!DELIVERY_TIME_WINDOWS.includes(time)) {
-    return { error: "Please choose a time window." };
-  }
 
   const admin = createAdminClient();
 
@@ -49,9 +41,13 @@ export async function placeOrder(
   // anchor — everything below is computed for THIS customer).
   const { data: customer } = await admin
     .from("customers")
-    .select("id, waive_delivery_minimum")
+    .select("id, waive_delivery_minimum, delivery_window")
     .eq("user_id", user.id)
-    .maybeSingle<{ id: string; waive_delivery_minimum: boolean }>();
+    .maybeSingle<{
+      id: string;
+      waive_delivery_minimum: boolean;
+      delivery_window: string | null;
+    }>();
   if (!customer) {
     return { error: "No customer profile is linked to your account." };
   }
@@ -134,7 +130,7 @@ export async function placeOrder(
       delivery_fee: deliveryFee,
       fulfillment_type: type,
       delivery_date: date,
-      delivery_time: time,
+      delivery_time: customer.delivery_window, // the customer's assigned window
     })
     .select("id, order_number")
     .single();

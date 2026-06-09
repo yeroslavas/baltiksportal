@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { updateCustomer, type ActionState } from "../../actions";
+import { DELIVERY_TIME_WINDOWS } from "@/lib/types";
 import type { Customer } from "@/lib/types";
 
 const initialState: ActionState = { error: null, success: null };
@@ -77,6 +78,27 @@ export function EditCustomerForm({ customer }: { customer: Customer }) {
           defaultValue={customer.address ?? ""}
           className={inputClass}
         />
+      </div>
+
+      <div className="flex flex-col gap-1.5 sm:col-span-2">
+        <label className="text-sm font-medium text-stone-700">
+          Delivery / pickup window
+        </label>
+        <select
+          name="delivery_window"
+          defaultValue={customer.delivery_window ?? ""}
+          className={inputClass}
+        >
+          <option value="">— none assigned —</option>
+          {DELIVERY_TIME_WINDOWS.map((w) => (
+            <option key={w} value={w}>
+              {w}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-stone-500">
+          Used for this customer&apos;s orders at checkout.
+        </p>
       </div>
 
       <div className="mt-2 border-t border-stone-200 pt-4 sm:col-span-2">

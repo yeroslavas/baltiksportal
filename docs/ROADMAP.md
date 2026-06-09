@@ -67,9 +67,12 @@ there by hand.
   price server-side from the catalog + the customer's overrides — the client's
   cart prices are never trusted. `order_items` snapshot `product_name` +
   `unit_price` at order time, so history is immutable.
-- **Fulfillment:** checkout captures delivery/pickup, a date, and a time window
-  (preset list in `DELIVERY_TIME_WINDOWS`), all required + validated server-side.
-  Stored on the order; shown on customer + admin order views.
+- **Fulfillment:** checkout captures delivery/pickup + a date (required). The
+  **time window is a customer attribute** (`customers.delivery_window`,
+  admin-assigned from `DELIVERY_TIME_WINDOWS` on the edit-customer form) — shown
+  read-only at checkout and **snapshotted onto each order's `delivery_time`** at
+  placement (so history holds the window the order was placed with). Shown on
+  customer + admin order views.
 - **Delivery fee:** delivery orders with a subtotal under `DELIVERY_MINIMUM`
   ($99) incur a flat `DELIVERY_FEE` ($15.99); pickup is always free. Computed
   server-side, stored in `orders.delivery_fee`, folded into `total_amount`.

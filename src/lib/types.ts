@@ -8,6 +8,8 @@ export type Customer = {
   email: string | null;
   phone: string | null;
   address: string | null;
+  // Assigned delivery/pickup window (admin-set; snapshotted onto orders).
+  delivery_window: string | null;
   // Internal/admin fields (not shown to the customer; managed via CSV import).
   sales_rep: string | null;
   tier: string | null;

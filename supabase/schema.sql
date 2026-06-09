@@ -17,6 +17,7 @@ create table if not exists public.customers (
   email         text,
   phone         text,
   address       text,
+  delivery_window text,
   sales_rep     text,
   tier          text,
   notes         text,
@@ -29,6 +30,8 @@ create table if not exists public.customers (
 alter table public.customers add column if not exists sales_rep text;
 alter table public.customers add column if not exists tier      text;
 alter table public.customers add column if not exists notes     text;
+-- The customer's assigned delivery/pickup time window (snapshotted onto orders).
+alter table public.customers add column if not exists delivery_window text;
 -- When true, this customer is exempt from the delivery minimum (free delivery).
 alter table public.customers add column if not exists waive_delivery_minimum boolean not null default false;
 -- When true, this customer may pay by invoice (vs upfront) — for the future payment flow.
