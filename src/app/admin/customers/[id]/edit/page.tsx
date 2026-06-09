@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getSettings } from "@/lib/settings";
 import type { Customer } from "@/lib/types";
 import { EditCustomerForm } from "./edit-customer-form";
 
@@ -10,6 +11,7 @@ export default async function EditCustomerPage({
 }) {
   const { id } = await params;
   const admin = createAdminClient();
+  const settings = await getSettings();
 
   const { data: customer } = await admin
     .from("customers")
@@ -49,7 +51,10 @@ export default async function EditCustomerPage({
       </div>
 
       <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-        <EditCustomerForm customer={customer} />
+        <EditCustomerForm
+          customer={customer}
+          deliveryWindows={settings.deliveryWindows}
+        />
       </section>
     </div>
   );

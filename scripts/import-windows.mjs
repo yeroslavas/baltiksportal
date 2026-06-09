@@ -11,7 +11,8 @@
 import { readFileSync, existsSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 
-// Keep in sync with DELIVERY_TIME_WINDOWS in src/lib/types.ts.
+// The canonical windows now live in the admin Utilities page (app_settings);
+// this list is for validating the bulk CSV. Keep it in step with that setting.
 const WINDOWS = ["7:00–8:30 AM", "9:30–11:30 AM"];
 // Shorthand aliases (e.g. from a source spreadsheet) → canonical window.
 const ALIASES = {

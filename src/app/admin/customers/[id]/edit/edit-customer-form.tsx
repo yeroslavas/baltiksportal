@@ -2,7 +2,6 @@
 
 import { useActionState } from "react";
 import { updateCustomer, type ActionState } from "../../actions";
-import { DELIVERY_TIME_WINDOWS } from "@/lib/types";
 import type { Customer } from "@/lib/types";
 
 const initialState: ActionState = { error: null, success: null };
@@ -10,7 +9,13 @@ const initialState: ActionState = { error: null, success: null };
 const inputClass =
   "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200";
 
-export function EditCustomerForm({ customer }: { customer: Customer }) {
+export function EditCustomerForm({
+  customer,
+  deliveryWindows,
+}: {
+  customer: Customer;
+  deliveryWindows: string[];
+}) {
   const [state, formAction, pending] = useActionState(
     updateCustomer,
     initialState,
@@ -90,7 +95,13 @@ export function EditCustomerForm({ customer }: { customer: Customer }) {
           className={inputClass}
         >
           <option value="">— none assigned —</option>
-          {DELIVERY_TIME_WINDOWS.map((w) => (
+          {/* Include the customer's current window even if it's no longer an
+              offered option, so saving doesn't silently drop it. */}
+          {(customer.delivery_window &&
+          !deliveryWindows.includes(customer.delivery_window)
+            ? [customer.delivery_window, ...deliveryWindows]
+            : deliveryWindows
+          ).map((w) => (
             <option key={w} value={w}>
               {w}
             </option>

@@ -5,11 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/lib/cart";
 import { formatPrice } from "@/lib/format";
-import {
-  DELIVERY_MINIMUM,
-  DELIVERY_FEE,
-  type FulfillmentType,
-} from "@/lib/types";
+import type { FulfillmentType } from "@/lib/types";
 import { placeOrder } from "./actions";
 
 const inputClass =
@@ -18,9 +14,13 @@ const inputClass =
 export function CheckoutView({
   waiveDeliveryMinimum,
   deliveryWindow,
+  deliveryFee: deliveryFeeRate,
+  deliveryMinimum,
 }: {
   waiveDeliveryMinimum: boolean;
   deliveryWindow: string | null;
+  deliveryFee: number;
+  deliveryMinimum: number;
 }) {
   const { items, total, clear } = useCart();
   const router = useRouter();
@@ -47,8 +47,10 @@ export function CheckoutView({
   const ready = Boolean(date);
   const noun = fulfillment === "pickup" ? "Pickup" : "Delivery";
   const deliveryFee =
-    fulfillment === "delivery" && !waiveDeliveryMinimum && total < DELIVERY_MINIMUM
-      ? DELIVERY_FEE
+    fulfillment === "delivery" &&
+    !waiveDeliveryMinimum &&
+    total < deliveryMinimum
+      ? deliveryFeeRate
       : 0;
   const grandTotal = total + deliveryFee;
 
@@ -154,9 +156,9 @@ export function CheckoutView({
       </div>
       {deliveryFee > 0 ? (
         <p className="rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-800">
-          Delivery orders under {formatPrice(DELIVERY_MINIMUM)} include a{" "}
-          {formatPrice(DELIVERY_FEE)} delivery fee — add{" "}
-          {formatPrice(DELIVERY_MINIMUM - total)} more to waive it.
+          Delivery orders under {formatPrice(deliveryMinimum)} include a{" "}
+          {formatPrice(deliveryFeeRate)} delivery fee — add{" "}
+          {formatPrice(deliveryMinimum - total)} more to waive it.
         </p>
       ) : fulfillment === "delivery" && waiveDeliveryMinimum ? (
         <p className="rounded-lg bg-green-50 px-3 py-2 text-xs text-green-800">
