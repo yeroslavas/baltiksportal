@@ -12,12 +12,12 @@ import { readFileSync, existsSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 
 // Keep in sync with DELIVERY_TIME_WINDOWS in src/lib/types.ts.
-const WINDOWS = [
-  "6:30–7:30 AM",
-  "7:30–8:30 AM",
-  "8:30–9:00 AM",
-  "9:00–10:00 AM",
-];
+const WINDOWS = ["7:00–8:30 AM", "9:30–11:30 AM"];
+// Shorthand aliases (e.g. from a source spreadsheet) → canonical window.
+const ALIASES = {
+  "7a-8:30a": "7:00–8:30 AM",
+  "9:30-11:30a": "9:30–11:30 AM",
+};
 const PATH = "data/delivery-windows.csv";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -63,7 +63,10 @@ function readTable(path) {
 
 const normalize = (s) =>
   String(s ?? "").toLowerCase().replace(/[–—-]/g, "-").replace(/\s+/g, " ").trim();
-const canonical = new Map(WINDOWS.map((w) => [normalize(w), w]));
+const canonical = new Map([
+  ...WINDOWS.map((w) => [normalize(w), w]),
+  ...Object.entries(ALIASES).map(([k, v]) => [normalize(k), v]),
+]);
 
 if (!existsSync(PATH)) {
   console.log(`${PATH} not found — create it (business_name, delivery_window).`);
