@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { generateStandingOrders } from "@/lib/standing-orders-run";
 
 export type ActionState = { error: string | null; success: string | null };
 
@@ -180,6 +181,41 @@ export async function updateStandingOrder(
   revalidatePath("/admin/standing-orders");
   revalidatePath(`/admin/standing-orders/${id}/edit`);
   return { error: null, success: "Standing order saved." };
+}
+
+export type GenerateState = { message: string | null; error: string | null };
+
+// Run the nightly generator on demand (creates any orders due within their
+// lead window). Idempotent — safe to run repeatedly.
+export async function runGenerator(
+  _prev: GenerateState,
+  _formData: FormData,
+): Promise<GenerateState> {
+  await requireAdmin();
+  const summary = await generateStandingOrders();
+
+  const created = summary.created.length;
+  let message =
+    created > 0
+      ? `Created ${created} order${created === 1 ? "" : "s"}.`
+      : "No new orders were due.";
+  const extra: string[] = [];
+  if (summary.alreadyPresent) extra.push(`${summary.alreadyPresent} already existed`);
+  if (summary.canceled.length) extra.push(`${summary.canceled.length} canceled`);
+  if (extra.length) message += ` (${extra.join(", ")})`;
+
+  revalidatePath("/admin/standing-orders");
+  revalidatePath("/admin/orders");
+  revalidatePath("/admin");
+
+  return {
+    message,
+    error: summary.errors.length
+      ? `${summary.errors.length} error(s): ${summary.errors
+          .map((e) => e.error)
+          .join("; ")}`
+      : null,
+  };
 }
 
 // Plain form action (not useActionState) for the delete button.

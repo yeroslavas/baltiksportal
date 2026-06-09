@@ -6,6 +6,7 @@ import {
   formatSchedule,
   nextOccurrence,
 } from "@/lib/standing-orders";
+import { RunGeneratorButton } from "./run-generator-button";
 import type { StandingOrder } from "@/lib/types";
 
 type Row = StandingOrder & { customers: { business_name: string } | null };
@@ -48,6 +49,14 @@ export default async function StandingOrdersPage() {
         >
           New standing order
         </Link>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+        <RunGeneratorButton />
+        <p className="text-xs text-stone-500">
+          Creates orders due within their lead window now, instead of waiting for
+          the nightly run. Safe to run repeatedly — it won’t duplicate.
+        </p>
       </div>
 
       {rows.length === 0 ? (
