@@ -30,8 +30,9 @@ export default async function EditStandingOrderPage({
         .eq("standing_order_id", id),
       admin
         .from("products")
-        .select("id, name, unit")
+        .select("id, name, unit, sort_order")
         .eq("is_active", true)
+        .order("sort_order", { ascending: true, nullsFirst: false })
         .order("name"),
     ]);
 
@@ -55,20 +56,22 @@ export default async function EditStandingOrderPage({
 
   // Include any item product that's no longer active, so its quantity shows and
   // isn't silently dropped on save.
-  const products = [...(activeProducts ?? [])] as {
-    id: string;
-    name: string;
-    unit: string;
-  }[];
+  type Prod = { id: string; name: string; unit: string; sort_order: number | null };
+  const products = [...(activeProducts ?? [])] as Prod[];
   const present = new Set(products.map((p) => p.id));
   const missingIds = items.map((i) => i.product_id).filter((pid) => !present.has(pid));
   if (missingIds.length > 0) {
     const { data: extra } = await admin
       .from("products")
-      .select("id, name, unit")
+      .select("id, name, unit, sort_order")
       .in("id", missingIds);
-    for (const p of extra ?? []) products.push(p);
-    products.sort((a, b) => a.name.localeCompare(b.name));
+    for (const p of (extra ?? []) as Prod[]) products.push(p);
+    // Keep catalog order (sort_order, then name) after merging the extras.
+    products.sort((a, b) => {
+      const sa = a.sort_order ?? Infinity;
+      const sb = b.sort_order ?? Infinity;
+      return sa !== sb ? sa - sb : a.name.localeCompare(b.name);
+    });
   }
 
   const initial = {
