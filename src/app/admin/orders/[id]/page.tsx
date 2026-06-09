@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice, formatDate } from "@/lib/format";
 import { OrderStatusForm } from "../order-status-form";
 import { FulfillmentInfo } from "@/components/fulfillment-info";
+import { StandingOrderBadge } from "@/components/standing-order-badge";
 import type { Order, OrderItem } from "@/lib/types";
 
 type OrderWithCustomer = Order & {
@@ -58,8 +59,9 @@ export default async function AdminOrderDetailPage({
           ← Back to orders
         </Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-stone-900">
+          <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight text-stone-900">
             Order #{order.order_number}
+            {order.standing_order_id ? <StandingOrderBadge /> : null}
           </h1>
           <OrderStatusForm id={order.id} status={order.status} />
         </div>

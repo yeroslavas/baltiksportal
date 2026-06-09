@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CustomerHeader } from "@/components/customer-header";
 import { StatusBadge } from "@/components/status-badge";
 import { FulfillmentInfo } from "@/components/fulfillment-info";
+import { StandingOrderBadge } from "@/components/standing-order-badge";
 import { formatPrice, formatDate } from "@/lib/format";
 import type { Order, OrderItem } from "@/lib/types";
 
@@ -77,8 +78,9 @@ export default async function OrderDetailPage({
         ) : null}
 
         <div className="mt-4 flex items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-stone-900">
+          <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight text-stone-900">
             Order #{order.order_number}
+            {order.standing_order_id ? <StandingOrderBadge /> : null}
           </h1>
           <StatusBadge status={order.status} />
         </div>
