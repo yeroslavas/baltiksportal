@@ -51,9 +51,9 @@ export function isoWeekday(d: string): number {
 // Monday of the date's week (for biweekly parity).
 const weekStart = (d: string): string => addDays(d, -(isoWeekday(d) - 1));
 
-// Does this template produce an order on calendar date D?
-export function occursOn(t: StandingOrderSchedule, d: string): boolean {
-  if (!t.is_active) return false;
+// Pattern only: weekday + interval + anchor/end window. Ignores active + skips
+// (used to list upcoming dates so the customer can toggle skips on them).
+function matchesPattern(t: StandingOrderSchedule, d: string): boolean {
   if (d < t.anchor_date) return false;
   if (t.end_date && d > t.end_date) return false;
   if (!t.days_of_week.includes(isoWeekday(d))) return false;
@@ -61,8 +61,30 @@ export function occursOn(t: StandingOrderSchedule, d: string): boolean {
     const weeks = daysBetween(weekStart(t.anchor_date), weekStart(d)) / 7;
     if (Math.round(weeks) % 2 !== 0) return false;
   }
-  if (t.skip_dates.includes(d)) return false;
   return true;
+}
+
+// Does this template actually produce an order on date D (active, not skipped)?
+export function occursOn(t: StandingOrderSchedule, d: string): boolean {
+  return t.is_active && matchesPattern(t, d) && !t.skip_dates.includes(d);
+}
+
+// The next `count` pattern dates on/after `from` — ignoring pause/skips, so the
+// UI can render each with its own skipped state and a toggle.
+export function scheduledDates(
+  t: StandingOrderSchedule,
+  from: string,
+  count: number,
+  horizonDays = 400,
+): string[] {
+  const out: string[] = [];
+  const start = from < t.anchor_date ? t.anchor_date : from;
+  for (let i = 0; i <= horizonDays && out.length < count; i++) {
+    const d = addDays(start, i);
+    if (t.end_date && d > t.end_date) break;
+    if (matchesPattern(t, d)) out.push(d);
+  }
+  return out;
 }
 
 // The next date on/after `from` that this template fires (null within horizon).

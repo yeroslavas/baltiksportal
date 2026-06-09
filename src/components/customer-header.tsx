@@ -45,6 +45,12 @@ export function CustomerHeader({
           >
             Orders
           </Link>
+          <Link
+            href="/standing"
+            className="text-sm font-medium text-brand-700 hover:underline"
+          >
+            Standing
+          </Link>
           <CartIndicator />
           {isAdminUser ? (
             <Link
