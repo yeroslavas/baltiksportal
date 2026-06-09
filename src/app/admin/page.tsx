@@ -8,10 +8,12 @@ export default async function AdminDashboard() {
     { count: customerCount },
     { count: productCount },
     { count: orderCount },
+    { count: standingOrderCount },
   ] = await Promise.all([
     admin.from("customers").select("*", { count: "exact", head: true }),
     admin.from("products").select("*", { count: "exact", head: true }),
     admin.from("orders").select("*", { count: "exact", head: true }),
+    admin.from("standing_orders").select("*", { count: "exact", head: true }),
   ]);
 
   const cards = [
@@ -38,6 +40,12 @@ export default async function AdminDashboard() {
       title: "Orders",
       value: orderCount ?? 0,
       blurb: "View orders and update fulfillment status.",
+    },
+    {
+      href: "/admin/standing-orders",
+      title: "Standing Orders",
+      value: standingOrderCount ?? 0,
+      blurb: "Recurring orders generated automatically.",
     },
     {
       href: "/admin/utilities",
