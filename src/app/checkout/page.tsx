@@ -1,16 +1,18 @@
 import { requireUser, isAdmin } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { CustomerHeader } from "@/components/customer-header";
 import { CheckoutView } from "./checkout-view";
 
 export default async function CheckoutPage() {
   const user = await requireUser();
-  const supabase = await createClient();
-  const { data: customer } = await supabase
+  // Service-role read, scoped to this user — waive_delivery_minimum is an
+  // internal column the customer's own API key can't see.
+  const admin = createAdminClient();
+  const { data: customer } = await admin
     .from("customers")
-    .select("business_name")
+    .select("business_name, waive_delivery_minimum")
     .eq("user_id", user.id)
-    .maybeSingle<{ business_name: string }>();
+    .maybeSingle<{ business_name: string; waive_delivery_minimum: boolean }>();
 
   return (
     <div className="flex flex-1 flex-col">
@@ -25,7 +27,9 @@ export default async function CheckoutPage() {
         <p className="mt-1 text-sm text-stone-500">
           Check everything over, then confirm to submit your order.
         </p>
-        <CheckoutView />
+        <CheckoutView
+          waiveDeliveryMinimum={customer?.waive_delivery_minimum ?? false}
+        />
       </main>
     </div>
   );

@@ -49,9 +49,9 @@ export async function placeOrder(
   // anchor — everything below is computed for THIS customer).
   const { data: customer } = await admin
     .from("customers")
-    .select("id")
+    .select("id, waive_delivery_minimum")
     .eq("user_id", user.id)
-    .maybeSingle<{ id: string }>();
+    .maybeSingle<{ id: string; waive_delivery_minimum: boolean }>();
   if (!customer) {
     return { error: "No customer profile is linked to your account." };
   }
@@ -115,9 +115,14 @@ export async function placeOrder(
   }
 
   const subtotal = round2(orderItems.reduce((s, i) => s + i.line_total, 0));
-  // Delivery fee applies only to delivery orders below the minimum.
+  // Delivery fee applies only to delivery orders below the minimum, unless the
+  // customer is exempt (waive_delivery_minimum).
   const deliveryFee =
-    type === "delivery" && subtotal < DELIVERY_MINIMUM ? DELIVERY_FEE : 0;
+    type === "delivery" &&
+    !customer.waive_delivery_minimum &&
+    subtotal < DELIVERY_MINIMUM
+      ? DELIVERY_FEE
+      : 0;
   const total = round2(subtotal + deliveryFee);
 
   // Create the order, then its items — roll the order back if items fail.

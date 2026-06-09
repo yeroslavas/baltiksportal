@@ -51,9 +51,10 @@ there by hand.
   product forms): one image per product in the public `product-images` Storage
   bucket; `image_url` on `products`. In-app uploads capped at 2MB.
 - **Internal vs customer-facing columns:** `products.sku/bake_time/product_type/
-  report_*` and `customers.sales_rep/tier/notes` are internal — column-level
-  grants hide them from the API roles (customers can't read them even on their
-  own row). The admin (service-role) sees everything.
+  report_*` and `customers.sales_rep/tier/notes/waive_delivery_minimum/
+  allow_invoicing` are internal — column-level grants hide them from the API
+  roles (customers can't read them even on their own row). The admin
+  (service-role) sees everything.
 - **Multi-location customers:** chains run by one person use `+` email aliases
   (e.g. `name+lafayette@x.com`) so each location is its own account with its own
   pricing, all delivering to one inbox. A true multi-location model is deferred.
@@ -66,6 +67,15 @@ there by hand.
   price server-side from the catalog + the customer's overrides — the client's
   cart prices are never trusted. `order_items` snapshot `product_name` +
   `unit_price` at order time, so history is immutable.
+- **Fulfillment:** checkout captures delivery/pickup, a date, and a time window
+  (preset list in `DELIVERY_TIME_WINDOWS`), all required + validated server-side.
+  Stored on the order; shown on customer + admin order views.
+- **Delivery fee:** delivery orders with a subtotal under `DELIVERY_MINIMUM`
+  ($99) incur a flat `DELIVERY_FEE` ($15.99); pickup is always free. Computed
+  server-side, stored in `orders.delivery_fee`, folded into `total_amount`.
+  Per-customer exemption via `customers.waive_delivery_minimum` (admin checkbox
+  on the edit-customer form) — exempt customers never pay it. Constants in
+  `src/lib/types.ts`.
 - **Status:** stored, default `pending`, values `pending → processing →
   fulfilled`; the **admin** updates it manually. (No auto-transitions, edit
   window, or cancel state — those were an earlier idea, not built.)
@@ -83,10 +93,12 @@ there by hand.
 
 Phase 2 scope still to build (all designed, none built):
 
-- **Invoices** — generate invoices from orders, mark paid, track outstanding.
-  (`/admin/invoices` is a placeholder.) Likely needs transactional email (SMTP,
-  e.g. Resend) — which would also enable self-service password reset + order
-  confirmation emails.
+- **Invoices / payment** — generate invoices from orders, mark paid, track
+  outstanding. (`/admin/invoices` is a placeholder.) The per-customer
+  `customers.allow_invoicing` flag (pay by invoice vs. upfront) already exists
+  for this — the payment flow will branch on it. Likely needs transactional
+  email (SMTP, e.g. Resend) — which would also enable self-service password
+  reset + order confirmation emails.
 - **Reporting** — sales by customer/product, order volume, revenue.
   (`/admin/reporting` is a placeholder; the `report_*` product fields feed this.)
 - **Team & roles** — self-service admin "Team" page with per-user roles

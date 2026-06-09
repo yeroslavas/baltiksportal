@@ -20,6 +20,8 @@ create table if not exists public.customers (
   sales_rep     text,
   tier          text,
   notes         text,
+  waive_delivery_minimum boolean not null default false,
+  allow_invoicing boolean not null default false,
   created_at    timestamptz not null default now()
 );
 
@@ -27,6 +29,10 @@ create table if not exists public.customers (
 alter table public.customers add column if not exists sales_rep text;
 alter table public.customers add column if not exists tier      text;
 alter table public.customers add column if not exists notes     text;
+-- When true, this customer is exempt from the delivery minimum (free delivery).
+alter table public.customers add column if not exists waive_delivery_minimum boolean not null default false;
+-- When true, this customer may pay by invoice (vs upfront) — for the future payment flow.
+alter table public.customers add column if not exists allow_invoicing boolean not null default false;
 
 -- Products: the catalog. base_price applies unless a customer override exists.
 -- name/description/unit/base_price are customer-facing; sku + the report_*/
