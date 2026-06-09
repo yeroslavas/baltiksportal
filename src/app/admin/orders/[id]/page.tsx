@@ -106,10 +106,25 @@ export default async function AdminOrderDetailPage({
           </tbody>
           <tfoot>
             <tr className="border-t border-stone-200">
-              <td
-                colSpan={3}
-                className="px-6 py-3 text-right text-sm text-stone-500"
-              >
+              <td colSpan={3} className="px-6 py-2 text-right text-sm text-stone-500">
+                Subtotal
+              </td>
+              <td className="px-6 py-2 text-right text-sm text-stone-900">
+                {formatPrice(order.total_amount - order.delivery_fee)}
+              </td>
+            </tr>
+            {order.delivery_fee > 0 ? (
+              <tr>
+                <td colSpan={3} className="px-6 py-2 text-right text-sm text-stone-500">
+                  Delivery fee
+                </td>
+                <td className="px-6 py-2 text-right text-sm text-stone-900">
+                  {formatPrice(order.delivery_fee)}
+                </td>
+              </tr>
+            ) : null}
+            <tr className="border-t border-stone-200">
+              <td colSpan={3} className="px-6 py-3 text-right text-sm font-medium text-stone-700">
                 Total
               </td>
               <td className="px-6 py-3 text-right text-lg font-bold text-stone-900">

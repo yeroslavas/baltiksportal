@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/lib/cart";
 import { formatPrice } from "@/lib/format";
-import { DELIVERY_TIME_WINDOWS, type FulfillmentType } from "@/lib/types";
+import {
+  DELIVERY_TIME_WINDOWS,
+  DELIVERY_MINIMUM,
+  DELIVERY_FEE,
+  type FulfillmentType,
+} from "@/lib/types";
 import { placeOrder } from "./actions";
 
 const inputClass =
@@ -37,6 +42,9 @@ export function CheckoutView() {
 
   const ready = Boolean(date && time);
   const noun = fulfillment === "pickup" ? "Pickup" : "Delivery";
+  const deliveryFee =
+    fulfillment === "delivery" && total < DELIVERY_MINIMUM ? DELIVERY_FEE : 0;
+  const grandTotal = total + deliveryFee;
 
   async function confirm() {
     if (!ready) return;
@@ -130,12 +138,33 @@ export function CheckoutView() {
         ))}
       </ul>
 
-      <div className="flex items-center justify-between rounded-2xl border border-stone-200 bg-white px-5 py-4">
-        <span className="text-sm text-stone-500">Order total</span>
-        <span className="text-xl font-bold text-stone-900">
-          {formatPrice(total)}
-        </span>
+      <div className="space-y-2 rounded-2xl border border-stone-200 bg-white px-5 py-4">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-stone-500">Subtotal</span>
+          <span className="text-stone-900">{formatPrice(total)}</span>
+        </div>
+        {fulfillment === "delivery" ? (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-stone-500">Delivery fee</span>
+            <span className="text-stone-900">
+              {deliveryFee > 0 ? formatPrice(deliveryFee) : "Free"}
+            </span>
+          </div>
+        ) : null}
+        <div className="flex items-center justify-between border-t border-stone-100 pt-2">
+          <span className="text-sm font-medium text-stone-700">Total</span>
+          <span className="text-xl font-bold text-stone-900">
+            {formatPrice(grandTotal)}
+          </span>
+        </div>
       </div>
+      {deliveryFee > 0 ? (
+        <p className="rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-800">
+          Delivery orders under {formatPrice(DELIVERY_MINIMUM)} include a{" "}
+          {formatPrice(DELIVERY_FEE)} delivery fee — add{" "}
+          {formatPrice(DELIVERY_MINIMUM - total)} more to waive it.
+        </p>
+      ) : null}
       <p className="text-xs text-stone-500">
         Final prices are confirmed at submission using your account pricing.
       </p>

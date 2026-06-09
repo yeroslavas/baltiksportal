@@ -155,6 +155,7 @@ create table if not exists public.orders (
   status        text not null default 'pending'
                   check (status in ('pending', 'processing', 'fulfilled')),
   total_amount  numeric(10,2) not null default 0 check (total_amount >= 0),
+  delivery_fee  numeric(10,2) not null default 0 check (delivery_fee >= 0),
   fulfillment_type text not null default 'delivery'
                   check (fulfillment_type in ('delivery', 'pickup')),
   delivery_date date,
@@ -182,6 +183,8 @@ alter table public.orders add column if not exists fulfillment_type text not nul
   default 'delivery' check (fulfillment_type in ('delivery', 'pickup'));
 alter table public.orders add column if not exists delivery_date date;
 alter table public.orders add column if not exists delivery_time text;
+alter table public.orders add column if not exists delivery_fee numeric(10,2)
+  not null default 0 check (delivery_fee >= 0);
 
 alter table public.orders      enable row level security;
 alter table public.order_items enable row level security;
