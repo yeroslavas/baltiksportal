@@ -248,3 +248,64 @@ create table if not exists public.app_settings (
 insert into public.app_settings (id) values (1) on conflict (id) do nothing;
 
 alter table public.app_settings enable row level security;
+
+-- ----------------------------------------------------------------------------
+-- Standing orders (recurring order templates)
+--
+-- A standing_orders row is a TEMPLATE, not an order: it describes a recurring
+-- schedule (which weekdays, weekly or every-other-week) and its line items.
+-- A daily generator materialises due templates into real public.orders rows a
+-- few days ahead (see src/lib/standing-orders + the cron route). Prices are NOT
+-- stored on the template — they're resolved at generation time, so pricing
+-- changes flow through automatically.
+--
+-- Read/written server-side with the service_role key (ownership checked in
+-- server actions), so RLS is on with no policies — like app_settings.
+-- ----------------------------------------------------------------------------
+
+create table if not exists public.standing_orders (
+  id               uuid primary key default gen_random_uuid(),
+  customer_id      uuid not null references public.customers (id) on delete cascade,
+  fulfillment_type text not null default 'delivery'
+                     check (fulfillment_type in ('delivery', 'pickup')),
+  -- ISO weekdays the order recurs on: 1 = Monday … 7 = Sunday.
+  days_of_week     int[] not null default '{}',
+  -- 1 = weekly, 2 = every other week (parity measured from anchor_date).
+  interval_weeks   smallint not null default 1 check (interval_weeks in (1, 2)),
+  -- First eligible date + biweekly parity anchor; optional last date.
+  anchor_date      date not null,
+  end_date         date,
+  -- One-off skips (holidays/closures) and a hard active/pause switch.
+  skip_dates       date[] not null default '{}',
+  is_active        boolean not null default true,
+  -- How many days before the delivery date to create the order (review window).
+  lead_days        smallint not null default 3 check (lead_days between 0 and 14),
+  note             text,
+  created_at       timestamptz not null default now()
+);
+
+create table if not exists public.standing_order_items (
+  id                uuid primary key default gen_random_uuid(),
+  standing_order_id uuid not null
+                      references public.standing_orders (id) on delete cascade,
+  product_id        uuid not null references public.products (id) on delete cascade,
+  quantity          integer not null check (quantity > 0),
+  created_at        timestamptz not null default now()
+);
+
+create index if not exists idx_standing_orders_customer
+  on public.standing_orders (customer_id);
+create index if not exists idx_standing_order_items_so
+  on public.standing_order_items (standing_order_id);
+
+-- Link a generated order back to its standing order. The PARTIAL UNIQUE index
+-- is the idempotency guarantee: at most one order per (standing order, delivery
+-- date), so the generator can run repeatedly / overlap without ever doubling up.
+alter table public.orders add column if not exists standing_order_id uuid
+  references public.standing_orders (id) on delete set null;
+create unique index if not exists orders_standing_order_date_key
+  on public.orders (standing_order_id, delivery_date)
+  where standing_order_id is not null;
+
+alter table public.standing_orders      enable row level security;
+alter table public.standing_order_items enable row level security;
