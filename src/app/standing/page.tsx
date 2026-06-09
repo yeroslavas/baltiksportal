@@ -17,7 +17,7 @@ import {
 type ItemRow = {
   standing_order_id: string;
   quantity: number;
-  products: { name: string } | null;
+  products: { name: string; sort_order: number | null } | null;
 };
 
 export default async function CustomerStandingOrdersPage() {
@@ -43,14 +43,29 @@ export default async function CustomerStandingOrdersPage() {
   const { data: itemData } = soIds.length
     ? await admin
         .from("standing_order_items")
-        .select("standing_order_id, quantity, products(name)")
+        .select("standing_order_id, quantity, products(name, sort_order)")
         .in("standing_order_id", soIds)
     : { data: [] };
-  const itemsBySo = new Map<string, { name: string; quantity: number }[]>();
+  const itemsBySo = new Map<
+    string,
+    { name: string; quantity: number; sortOrder: number | null }[]
+  >();
   for (const it of (itemData ?? []) as unknown as ItemRow[]) {
     const arr = itemsBySo.get(it.standing_order_id) ?? [];
-    arr.push({ name: it.products?.name ?? "Item", quantity: it.quantity });
+    arr.push({
+      name: it.products?.name ?? "Item",
+      quantity: it.quantity,
+      sortOrder: it.products?.sort_order ?? null,
+    });
     itemsBySo.set(it.standing_order_id, arr);
+  }
+  // Match the catalog ordering (sort_order, then name).
+  for (const arr of itemsBySo.values()) {
+    arr.sort((a, b) => {
+      const sa = a.sortOrder ?? Infinity;
+      const sb = b.sortOrder ?? Infinity;
+      return sa !== sb ? sa - sb : a.name.localeCompare(b.name);
+    });
   }
 
   const today = businessToday();

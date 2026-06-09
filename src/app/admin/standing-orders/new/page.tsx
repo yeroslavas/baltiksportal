@@ -11,6 +11,7 @@ export default async function NewStandingOrderPage() {
       .from("products")
       .select("id, name, unit")
       .eq("is_active", true)
+      .order("sort_order", { ascending: true, nullsFirst: false })
       .order("name"),
   ]);
 
