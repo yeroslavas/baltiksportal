@@ -12,6 +12,8 @@ export type Customer = {
   sales_rep: string | null;
   tier: string | null;
   notes: string | null;
+  waive_delivery_minimum: boolean;
+  allow_invoicing: boolean;
   created_at: string;
 };
 

@@ -16,7 +16,11 @@ import { placeOrder } from "./actions";
 const inputClass =
   "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200";
 
-export function CheckoutView() {
+export function CheckoutView({
+  waiveDeliveryMinimum,
+}: {
+  waiveDeliveryMinimum: boolean;
+}) {
   const { items, total, clear } = useCart();
   const router = useRouter();
   const [fulfillment, setFulfillment] = useState<FulfillmentType>("delivery");
@@ -43,7 +47,9 @@ export function CheckoutView() {
   const ready = Boolean(date && time);
   const noun = fulfillment === "pickup" ? "Pickup" : "Delivery";
   const deliveryFee =
-    fulfillment === "delivery" && total < DELIVERY_MINIMUM ? DELIVERY_FEE : 0;
+    fulfillment === "delivery" && !waiveDeliveryMinimum && total < DELIVERY_MINIMUM
+      ? DELIVERY_FEE
+      : 0;
   const grandTotal = total + deliveryFee;
 
   async function confirm() {
@@ -163,6 +169,10 @@ export function CheckoutView() {
           Delivery orders under {formatPrice(DELIVERY_MINIMUM)} include a{" "}
           {formatPrice(DELIVERY_FEE)} delivery fee — add{" "}
           {formatPrice(DELIVERY_MINIMUM - total)} more to waive it.
+        </p>
+      ) : fulfillment === "delivery" && waiveDeliveryMinimum ? (
+        <p className="rounded-lg bg-green-50 px-3 py-2 text-xs text-green-800">
+          Free delivery on your account — no minimum.
         </p>
       ) : null}
       <p className="text-xs text-stone-500">

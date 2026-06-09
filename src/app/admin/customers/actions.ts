@@ -120,6 +120,8 @@ export async function updateCustomer(
       sales_rep: get("sales_rep") || null,
       tier: get("tier") || null,
       notes: get("notes") || null,
+      waive_delivery_minimum: formData.get("waive_delivery_minimum") === "on",
+      allow_invoicing: formData.get("allow_invoicing") === "on",
     })
     .eq("id", id);
   if (updateError) return { error: updateError.message, success: null };

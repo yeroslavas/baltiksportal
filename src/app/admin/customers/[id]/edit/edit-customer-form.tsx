@@ -110,6 +110,38 @@ export function EditCustomerForm({ customer }: { customer: Customer }) {
         />
       </div>
 
+      <div className="flex items-center gap-2 sm:col-span-2">
+        <input
+          id="waive_delivery_minimum"
+          type="checkbox"
+          name="waive_delivery_minimum"
+          defaultChecked={customer.waive_delivery_minimum}
+          className="h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-2 focus:ring-brand-200"
+        />
+        <label
+          htmlFor="waive_delivery_minimum"
+          className="text-sm font-medium text-stone-700"
+        >
+          Waive delivery minimum (free delivery — no $99 minimum / $15.99 fee)
+        </label>
+      </div>
+
+      <div className="flex items-center gap-2 sm:col-span-2">
+        <input
+          id="allow_invoicing"
+          type="checkbox"
+          name="allow_invoicing"
+          defaultChecked={customer.allow_invoicing}
+          className="h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-2 focus:ring-brand-200"
+        />
+        <label
+          htmlFor="allow_invoicing"
+          className="text-sm font-medium text-stone-700"
+        >
+          Allow invoicing (pay by invoice instead of upfront)
+        </label>
+      </div>
+
       {state.error ? (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-2">
           {state.error}
