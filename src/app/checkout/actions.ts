@@ -2,19 +2,41 @@
 
 import { getUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { DELIVERY_TIME_WINDOWS } from "@/lib/types";
 
 type CartLine = { productId: string; quantity: number };
+type Fulfillment = { type: string; date: string; time: string };
 type PlaceOrderResult =
   | { orderId: string; orderNumber: number; error?: undefined }
   | { error: string; orderId?: undefined; orderNumber?: undefined };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-export async function placeOrder(lines: CartLine[]): Promise<PlaceOrderResult> {
+export async function placeOrder(
+  lines: CartLine[],
+  fulfillment: Fulfillment,
+): Promise<PlaceOrderResult> {
   const user = await getUser();
   if (!user) return { error: "Please sign in to place an order." };
   if (!Array.isArray(lines) || lines.length === 0) {
     return { error: "Your cart is empty." };
+  }
+
+  // Fulfillment details — all required, validated server-side.
+  const type =
+    fulfillment?.type === "pickup"
+      ? "pickup"
+      : fulfillment?.type === "delivery"
+        ? "delivery"
+        : null;
+  if (!type) return { error: "Please choose delivery or pickup." };
+  const date = String(fulfillment?.date ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return { error: "Please choose a valid date." };
+  }
+  const time = String(fulfillment?.time ?? "").trim();
+  if (!DELIVERY_TIME_WINDOWS.includes(time)) {
+    return { error: "Please choose a time window." };
   }
 
   const admin = createAdminClient();
@@ -93,7 +115,13 @@ export async function placeOrder(lines: CartLine[]): Promise<PlaceOrderResult> {
   // Create the order, then its items — roll the order back if items fail.
   const { data: order, error: orderErr } = await admin
     .from("orders")
-    .insert({ customer_id: customer.id, total_amount: total })
+    .insert({
+      customer_id: customer.id,
+      total_amount: total,
+      fulfillment_type: type,
+      delivery_date: date,
+      delivery_time: time,
+    })
     .select("id, order_number")
     .single();
   if (orderErr || !order) {

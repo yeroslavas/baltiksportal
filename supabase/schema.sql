@@ -155,6 +155,10 @@ create table if not exists public.orders (
   status        text not null default 'pending'
                   check (status in ('pending', 'processing', 'fulfilled')),
   total_amount  numeric(10,2) not null default 0 check (total_amount >= 0),
+  fulfillment_type text not null default 'delivery'
+                  check (fulfillment_type in ('delivery', 'pickup')),
+  delivery_date date,
+  delivery_time text,
   created_at    timestamptz not null default now()
 );
 
@@ -172,6 +176,12 @@ create table if not exists public.order_items (
 create index if not exists idx_orders_customer  on public.orders (customer_id);
 create index if not exists idx_orders_date       on public.orders (order_date desc);
 create index if not exists idx_order_items_order on public.order_items (order_id);
+
+-- Phase 2.1: fulfillment fields (idempotent for existing databases).
+alter table public.orders add column if not exists fulfillment_type text not null
+  default 'delivery' check (fulfillment_type in ('delivery', 'pickup'));
+alter table public.orders add column if not exists delivery_date date;
+alter table public.orders add column if not exists delivery_time text;
 
 alter table public.orders      enable row level security;
 alter table public.order_items enable row level security;

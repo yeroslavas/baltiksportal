@@ -3,6 +3,7 @@ import { requireUser, isAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { CustomerHeader } from "@/components/customer-header";
 import { StatusBadge } from "@/components/status-badge";
+import { FulfillmentInfo } from "@/components/fulfillment-info";
 import { formatPrice, formatDate } from "@/lib/format";
 import type { Order, OrderItem } from "@/lib/types";
 
@@ -84,6 +85,10 @@ export default async function OrderDetailPage({
         <p className="mt-1 text-sm text-stone-500">
           {formatDate(order.order_date)}
         </p>
+
+        <div className="mt-4">
+          <FulfillmentInfo order={order} />
+        </div>
 
         <section className="mt-6 overflow-x-auto rounded-2xl border border-stone-200 bg-white">
           <table className="w-full min-w-[28rem] text-left text-sm">

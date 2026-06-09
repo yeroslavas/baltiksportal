@@ -38,7 +38,8 @@ export default async function AdminOrdersPage() {
                 <tr className="border-b border-stone-200">
                   <th className="px-6 py-3">Order</th>
                   <th className="px-6 py-3">Customer</th>
-                  <th className="px-6 py-3">Date</th>
+                  <th className="px-6 py-3">Ordered</th>
+                  <th className="px-6 py-3">Fulfillment</th>
                   <th className="px-6 py-3">Total</th>
                   <th className="px-6 py-3">Status</th>
                   <th className="px-6 py-3"></th>
@@ -58,6 +59,13 @@ export default async function AdminOrdersPage() {
                     </td>
                     <td className="px-6 py-3 text-stone-600">
                       {formatDate(o.order_date)}
+                    </td>
+                    <td className="px-6 py-3 text-stone-600">
+                      {o.delivery_date ? formatDate(o.delivery_date) : "—"}
+                      <span className="capitalize text-stone-400">
+                        {" · "}
+                        {o.fulfillment_type}
+                      </span>
                     </td>
                     <td className="px-6 py-3 text-stone-900">
                       {formatPrice(o.total_amount)}
