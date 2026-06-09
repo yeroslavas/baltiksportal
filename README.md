@@ -158,3 +158,4 @@ src/app/
 | `npm run lint` | ESLint |
 | `node --env-file=.env.local scripts/import-data.mjs [--dry-run]` | Bulk-import products/customers/pricing from `data/*.csv` |
 | `node --env-file=.env.local scripts/import-images.mjs` | Upload product photos from `data/images/<sku>.{jpg,png,webp}` to Supabase Storage |
+| `node --env-file=.env.local scripts/import-windows.mjs` | Bulk-assign customer delivery/pickup windows from `data/delivery-windows.csv` |
