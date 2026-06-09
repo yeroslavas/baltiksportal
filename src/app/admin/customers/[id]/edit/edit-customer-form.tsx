@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { updateCustomer, type ActionState } from "../../actions";
+import { PhoneInput } from "@/components/phone-input";
 import type { Customer } from "@/lib/types";
 
 const initialState: ActionState = { error: null, success: null };
@@ -69,7 +70,7 @@ export function EditCustomerForm({
 
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-stone-700">Phone</label>
-        <input
+        <PhoneInput
           name="phone"
           defaultValue={customer.phone ?? ""}
           className={inputClass}

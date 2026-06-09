@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { formatPhone } from "@/lib/format";
 import type { Customer } from "@/lib/types";
 import { CreateCustomerForm } from "./create-customer-form";
 import { ResetPasswordForm } from "./reset-password-form";
@@ -57,7 +58,9 @@ export default async function AdminCustomersPage() {
                     {c.contact_name ?? "—"}
                   </td>
                   <td className="px-6 py-3 text-stone-600">{c.email ?? "—"}</td>
-                  <td className="px-6 py-3 text-stone-600">{c.phone ?? "—"}</td>
+                  <td className="px-6 py-3 text-stone-600">
+                    {c.phone ? formatPhone(c.phone) : "—"}
+                  </td>
                   <td className="px-6 py-3 align-top text-right">
                     <div className="flex flex-col items-end gap-2">
                       <Link
