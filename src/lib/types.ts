@@ -89,3 +89,27 @@ export type OrderItem = {
   line_total: number;
   created_at: string;
 };
+
+// Recurring order template (see src/lib/standing-orders.ts for scheduling).
+export type StandingOrder = {
+  id: string;
+  customer_id: string;
+  fulfillment_type: FulfillmentType;
+  days_of_week: number[]; // ISO 1=Mon … 7=Sun
+  interval_weeks: number; // 1 weekly, 2 every other week
+  anchor_date: string;
+  end_date: string | null;
+  skip_dates: string[];
+  is_active: boolean;
+  lead_days: number;
+  note: string | null;
+  created_at: string;
+};
+
+export type StandingOrderItem = {
+  id: string;
+  standing_order_id: string;
+  product_id: string;
+  quantity: number;
+  created_at: string;
+};

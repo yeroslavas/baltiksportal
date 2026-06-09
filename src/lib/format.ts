@@ -17,6 +17,18 @@ export function formatDate(value: string | Date): string {
   return dateFmt.format(new Date(value));
 }
 
+const dateOnlyFmt = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
+// Format a calendar date ("YYYY-MM-DD") without timezone drift.
+export function formatDateOnly(value: string): string {
+  return dateOnlyFmt.format(new Date(`${value}T00:00:00Z`));
+}
+
 // Progressive formatting as a phone number is typed: digits → (###)###-####.
 // Caps at 10 digits and strips anything else, so paste/backspace stay clean.
 export function formatPhoneInput(value: string): string {
