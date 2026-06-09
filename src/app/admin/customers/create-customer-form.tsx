@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { createCustomer, type ActionState } from "./actions";
+import { PhoneInput } from "@/components/phone-input";
 
 const initialState: ActionState = { error: null, success: null };
 
@@ -59,7 +60,7 @@ export function CreateCustomerForm() {
 
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-stone-700">Phone</label>
-        <input name="phone" className={inputClass} />
+        <PhoneInput name="phone" className={inputClass} />
       </div>
 
       <div className="flex flex-col gap-1.5 sm:col-span-2">
