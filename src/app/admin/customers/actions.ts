@@ -117,6 +117,7 @@ export async function updateCustomer(
       email,
       phone: get("phone") || null,
       address: get("address") || null,
+      delivery_window: get("delivery_window") || null,
       sales_rep: get("sales_rep") || null,
       tier: get("tier") || null,
       notes: get("notes") || null,

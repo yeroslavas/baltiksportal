@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useCart } from "@/lib/cart";
 import { formatPrice } from "@/lib/format";
 import {
-  DELIVERY_TIME_WINDOWS,
   DELIVERY_MINIMUM,
   DELIVERY_FEE,
   type FulfillmentType,
@@ -18,14 +17,15 @@ const inputClass =
 
 export function CheckoutView({
   waiveDeliveryMinimum,
+  deliveryWindow,
 }: {
   waiveDeliveryMinimum: boolean;
+  deliveryWindow: string | null;
 }) {
   const { items, total, clear } = useCart();
   const router = useRouter();
   const [fulfillment, setFulfillment] = useState<FulfillmentType>("delivery");
   const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,7 +44,7 @@ export function CheckoutView({
     );
   }
 
-  const ready = Boolean(date && time);
+  const ready = Boolean(date);
   const noun = fulfillment === "pickup" ? "Pickup" : "Delivery";
   const deliveryFee =
     fulfillment === "delivery" && !waiveDeliveryMinimum && total < DELIVERY_MINIMUM
@@ -58,7 +58,7 @@ export function CheckoutView({
     setError(null);
     const res = await placeOrder(
       items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
-      { type: fulfillment, date, time },
+      { type: fulfillment, date },
     );
     if (res.error) {
       setError(res.error);
@@ -107,23 +107,11 @@ export function CheckoutView({
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-stone-700">
-              {noun} time *
+              {noun} window
             </label>
-            <select
-              required
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              className={inputClass}
-            >
-              <option value="" disabled>
-                Select a window…
-              </option>
-              {DELIVERY_TIME_WINDOWS.map((w) => (
-                <option key={w} value={w}>
-                  {w}
-                </option>
-              ))}
-            </select>
+            <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700">
+              {deliveryWindow ?? "To be confirmed by Baltik's"}
+            </div>
           </div>
         </div>
       </section>
