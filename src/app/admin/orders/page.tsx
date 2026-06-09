@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice, formatDate } from "@/lib/format";
 import { OrderStatusForm } from "./order-status-form";
+import { StandingOrderBadge } from "@/components/standing-order-badge";
 import type { Order } from "@/lib/types";
 
 type OrderRow = Order & { customers: { business_name: string } | null };
@@ -52,7 +53,10 @@ export default async function AdminOrdersPage() {
                     className="border-b border-stone-100 last:border-0"
                   >
                     <td className="px-6 py-3 font-medium text-stone-900">
-                      #{o.order_number}
+                      <span className="flex items-center gap-2">
+                        #{o.order_number}
+                        {o.standing_order_id ? <StandingOrderBadge /> : null}
+                      </span>
                     </td>
                     <td className="px-6 py-3 text-stone-600">
                       {o.customers?.business_name ?? "—"}

@@ -76,6 +76,8 @@ export type Order = {
   fulfillment_type: FulfillmentType;
   delivery_date: string | null;
   delivery_time: string | null;
+  // Set when the order was generated from a standing order.
+  standing_order_id: string | null;
   created_at: string;
 };
 

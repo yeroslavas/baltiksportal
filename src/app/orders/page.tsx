@@ -3,6 +3,7 @@ import { requireUser, isAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { CustomerHeader } from "@/components/customer-header";
 import { StatusBadge } from "@/components/status-badge";
+import { StandingOrderBadge } from "@/components/standing-order-badge";
 import { formatPrice, formatDate } from "@/lib/format";
 import type { Order } from "@/lib/types";
 
@@ -53,8 +54,9 @@ export default async function OrdersPage() {
                   className="flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-stone-50"
                 >
                   <div>
-                    <p className="font-semibold text-stone-900">
+                    <p className="flex items-center gap-2 font-semibold text-stone-900">
                       Order #{o.order_number}
+                      {o.standing_order_id ? <StandingOrderBadge /> : null}
                     </p>
                     <p className="text-xs text-stone-500">
                       Ordered {formatDate(o.order_date)}
