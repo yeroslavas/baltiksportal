@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCart } from "@/lib/cart";
 import { formatPrice } from "@/lib/format";
+import { QuantityInput } from "@/components/quantity-input";
 
 export function CartView({
   deliveryFee,
@@ -39,15 +40,10 @@ export function CartView({
                 {formatPrice(i.unitPrice)} per {i.unit}
               </p>
             </div>
-            <input
-              type="number"
-              min={1}
+            <QuantityInput
               value={i.quantity}
-              onChange={(e) => {
-                const q = parseInt(e.target.value, 10);
-                if (q >= 1) updateQuantity(i.productId, q);
-              }}
-              aria-label={`Quantity of ${i.name}`}
+              onCommit={(q) => updateQuantity(i.productId, q)}
+              ariaLabel={`Quantity of ${i.name}`}
               className="w-16 rounded-lg border border-stone-300 px-2 py-1.5 text-sm text-stone-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
             />
             <p className="w-20 text-right font-semibold text-stone-900">
