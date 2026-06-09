@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCart } from "@/lib/cart";
 import { formatPrice } from "@/lib/format";
+import { DELIVERY_MINIMUM, DELIVERY_FEE } from "@/lib/types";
 
 export function CartView() {
   const { items, total, updateQuantity, removeItem } = useCart();
@@ -59,11 +60,15 @@ export function CartView() {
       </ul>
 
       <div className="flex items-center justify-between rounded-2xl border border-stone-200 bg-white px-5 py-4">
-        <span className="text-sm text-stone-500">Total</span>
+        <span className="text-sm text-stone-500">Subtotal</span>
         <span className="text-xl font-bold text-stone-900">
           {formatPrice(total)}
         </span>
       </div>
+      <p className="text-xs text-stone-500">
+        Delivery orders under {formatPrice(DELIVERY_MINIMUM)} add a{" "}
+        {formatPrice(DELIVERY_FEE)} fee — choose delivery or pickup at checkout.
+      </p>
 
       <div className="flex items-center justify-between">
         <Link

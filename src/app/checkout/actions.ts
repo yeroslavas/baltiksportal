@@ -2,7 +2,11 @@
 
 import { getUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { DELIVERY_TIME_WINDOWS } from "@/lib/types";
+import {
+  DELIVERY_TIME_WINDOWS,
+  DELIVERY_MINIMUM,
+  DELIVERY_FEE,
+} from "@/lib/types";
 
 type CartLine = { productId: string; quantity: number };
 type Fulfillment = { type: string; date: string; time: string };
@@ -110,7 +114,11 @@ export async function placeOrder(
     });
   }
 
-  const total = round2(orderItems.reduce((s, i) => s + i.line_total, 0));
+  const subtotal = round2(orderItems.reduce((s, i) => s + i.line_total, 0));
+  // Delivery fee applies only to delivery orders below the minimum.
+  const deliveryFee =
+    type === "delivery" && subtotal < DELIVERY_MINIMUM ? DELIVERY_FEE : 0;
+  const total = round2(subtotal + deliveryFee);
 
   // Create the order, then its items — roll the order back if items fail.
   const { data: order, error: orderErr } = await admin
@@ -118,6 +126,7 @@ export async function placeOrder(
     .insert({
       customer_id: customer.id,
       total_amount: total,
+      delivery_fee: deliveryFee,
       fulfillment_type: type,
       delivery_date: date,
       delivery_time: time,

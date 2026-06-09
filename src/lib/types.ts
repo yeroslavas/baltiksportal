@@ -66,6 +66,11 @@ export const DELIVERY_TIME_WINDOWS = [
   "9:00–10:00 AM",
 ];
 
+// Delivery orders with a subtotal under the minimum incur a flat fee. Pickup is
+// always free.
+export const DELIVERY_MINIMUM = 99;
+export const DELIVERY_FEE = 15.99;
+
 export type Order = {
   id: string;
   order_number: number;
@@ -73,6 +78,7 @@ export type Order = {
   order_date: string;
   status: OrderStatus;
   total_amount: number;
+  delivery_fee: number;
   fulfillment_type: FulfillmentType;
   delivery_date: string | null;
   delivery_time: string | null;
