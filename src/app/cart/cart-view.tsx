@@ -3,9 +3,14 @@
 import Link from "next/link";
 import { useCart } from "@/lib/cart";
 import { formatPrice } from "@/lib/format";
-import { DELIVERY_MINIMUM, DELIVERY_FEE } from "@/lib/types";
 
-export function CartView() {
+export function CartView({
+  deliveryFee,
+  deliveryMinimum,
+}: {
+  deliveryFee: number;
+  deliveryMinimum: number;
+}) {
   const { items, total, updateQuantity, removeItem } = useCart();
 
   if (items.length === 0) {
@@ -66,8 +71,8 @@ export function CartView() {
         </span>
       </div>
       <p className="text-xs text-stone-500">
-        Delivery orders under {formatPrice(DELIVERY_MINIMUM)} add a{" "}
-        {formatPrice(DELIVERY_FEE)} fee — choose delivery or pickup at checkout.
+        Delivery orders under {formatPrice(deliveryMinimum)} add a{" "}
+        {formatPrice(deliveryFee)} fee — choose delivery or pickup at checkout.
       </p>
 
       <div className="flex items-center justify-between">

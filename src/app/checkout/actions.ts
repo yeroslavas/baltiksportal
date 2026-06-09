@@ -2,7 +2,7 @@
 
 import { getUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { DELIVERY_MINIMUM, DELIVERY_FEE } from "@/lib/types";
+import { getSettings } from "@/lib/settings";
 
 type CartLine = { productId: string; quantity: number };
 type Fulfillment = { type: string; date: string };
@@ -112,12 +112,13 @@ export async function placeOrder(
 
   const subtotal = round2(orderItems.reduce((s, i) => s + i.line_total, 0));
   // Delivery fee applies only to delivery orders below the minimum, unless the
-  // customer is exempt (waive_delivery_minimum).
+  // customer is exempt (waive_delivery_minimum). Fee/minimum are admin-set.
+  const settings = await getSettings();
   const deliveryFee =
     type === "delivery" &&
     !customer.waive_delivery_minimum &&
-    subtotal < DELIVERY_MINIMUM
-      ? DELIVERY_FEE
+    subtotal < settings.deliveryMinimum
+      ? settings.deliveryFee
       : 0;
   const total = round2(subtotal + deliveryFee);
 

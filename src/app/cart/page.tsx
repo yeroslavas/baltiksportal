@@ -1,10 +1,12 @@
 import { requireUser, isAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getSettings } from "@/lib/settings";
 import { CustomerHeader } from "@/components/customer-header";
 import { CartView } from "./cart-view";
 
 export default async function CartPage() {
   const user = await requireUser();
+  const settings = await getSettings();
   const supabase = await createClient();
   const { data: customer } = await supabase
     .from("customers")
@@ -22,7 +24,10 @@ export default async function CartPage() {
         <h1 className="text-2xl font-bold tracking-tight text-stone-900">
           Your cart
         </h1>
-        <CartView />
+        <CartView
+          deliveryFee={settings.deliveryFee}
+          deliveryMinimum={settings.deliveryMinimum}
+        />
       </main>
     </div>
   );

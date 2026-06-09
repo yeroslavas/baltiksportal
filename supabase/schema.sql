@@ -225,3 +225,26 @@ create policy "read own order items"
       where c.user_id = (select auth.uid())
     )
   );
+
+-- ----------------------------------------------------------------------------
+-- App settings (admin Utilities page)
+--
+-- A single pinned row (id = 1) holding admin-editable operational settings:
+-- the delivery fee, the delivery minimum, and the list of delivery/pickup
+-- windows. Read server-side with the service_role key (src/lib/settings.ts);
+-- the admin Utilities page updates it. RLS is on with NO policies, so the
+-- customer API keys can't read or write it — only the service_role can.
+-- ----------------------------------------------------------------------------
+
+create table if not exists public.app_settings (
+  id               smallint primary key default 1 check (id = 1),
+  delivery_fee     numeric(10,2) not null default 15.99 check (delivery_fee >= 0),
+  delivery_minimum numeric(10,2) not null default 99 check (delivery_minimum >= 0),
+  delivery_windows text[] not null default array['7:00–8:30 AM', '9:30–11:30 AM'],
+  updated_at       timestamptz not null default now()
+);
+
+-- Seed the single row (no-op once it exists).
+insert into public.app_settings (id) values (1) on conflict (id) do nothing;
+
+alter table public.app_settings enable row level security;

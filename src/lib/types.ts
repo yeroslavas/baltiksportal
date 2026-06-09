@@ -62,13 +62,8 @@ export const ORDER_STATUSES: OrderStatus[] = [
 
 export type FulfillmentType = "delivery" | "pickup";
 
-// Delivery/pickup time windows (admin-assigned per customer; shown at checkout).
-export const DELIVERY_TIME_WINDOWS = ["7:00–8:30 AM", "9:30–11:30 AM"];
-
-// Delivery orders with a subtotal under the minimum incur a flat fee. Pickup is
-// always free.
-export const DELIVERY_MINIMUM = 99;
-export const DELIVERY_FEE = 15.99;
+// The delivery fee, delivery minimum, and delivery/pickup windows are now
+// admin-editable — see src/lib/settings.ts (backed by public.app_settings).
 
 export type Order = {
   id: string;

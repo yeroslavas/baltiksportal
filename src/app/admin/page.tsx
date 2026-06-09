@@ -39,6 +39,12 @@ export default async function AdminDashboard() {
       value: orderCount ?? 0,
       blurb: "View orders and update fulfillment status.",
     },
+    {
+      href: "/admin/utilities",
+      title: "Utilities",
+      value: "→",
+      blurb: "Delivery fee, delivery minimum, and time windows.",
+    },
   ];
 
   return (

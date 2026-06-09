@@ -1,10 +1,12 @@
 import { requireUser, isAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getSettings } from "@/lib/settings";
 import { CustomerHeader } from "@/components/customer-header";
 import { CheckoutView } from "./checkout-view";
 
 export default async function CheckoutPage() {
   const user = await requireUser();
+  const settings = await getSettings();
   // Service-role read, scoped to this user — waive_delivery_minimum is an
   // internal column the customer's own API key can't see.
   const admin = createAdminClient();
@@ -34,6 +36,8 @@ export default async function CheckoutPage() {
         <CheckoutView
           waiveDeliveryMinimum={customer?.waive_delivery_minimum ?? false}
           deliveryWindow={customer?.delivery_window ?? null}
+          deliveryFee={settings.deliveryFee}
+          deliveryMinimum={settings.deliveryMinimum}
         />
       </main>
     </div>
