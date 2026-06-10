@@ -1,12 +1,30 @@
 import { requireUser, isAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
+import {
+  earliestFulfillmentDate,
+  formatCutoffHour,
+} from "@/lib/order-cutoff";
 import { CustomerHeader } from "@/components/customer-header";
 import { CheckoutView } from "./checkout-view";
 
 export default async function CheckoutPage() {
   const user = await requireUser();
   const settings = await getSettings();
+  const userIsAdmin = isAdmin(user.email);
+
+  // The cutoff restricts customers only. For admins (or when disabled) we pass
+  // null, so the picker has no floor and no cutoff note is shown.
+  const cutoff =
+    settings.orderCutoffEnabled && !userIsAdmin
+      ? {
+          earliestDate: earliestFulfillmentDate(
+            new Date(),
+            settings.orderCutoffHour,
+          ),
+          label: formatCutoffHour(settings.orderCutoffHour),
+        }
+      : null;
   // Service-role read, scoped to this user — waive_delivery_minimum is an
   // internal column the customer's own API key can't see.
   const admin = createAdminClient();
@@ -24,7 +42,7 @@ export default async function CheckoutPage() {
     <div className="flex flex-1 flex-col">
       <CustomerHeader
         label={customer?.business_name ?? user.email ?? ""}
-        isAdminUser={isAdmin(user.email)}
+        isAdminUser={userIsAdmin}
       />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
         <h1 className="text-2xl font-bold tracking-tight text-stone-900">
@@ -38,6 +56,7 @@ export default async function CheckoutPage() {
           deliveryWindow={customer?.delivery_window ?? null}
           deliveryFee={settings.deliveryFee}
           deliveryMinimum={settings.deliveryMinimum}
+          cutoff={cutoff}
         />
       </main>
     </div>

@@ -1,8 +1,11 @@
 "use server";
 
-import { getUser } from "@/lib/auth";
+import { getUser, isAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createOrderForCustomer } from "@/lib/orders";
+import { getSettings } from "@/lib/settings";
+import { earliestFulfillmentDate } from "@/lib/order-cutoff";
+import { formatDateOnly } from "@/lib/format";
 
 type CartLine = { productId: string; quantity: number };
 type Fulfillment = { type: string; date: string };
@@ -31,6 +34,25 @@ export async function placeOrder(
   const date = String(fulfillment?.date ?? "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return { error: "Please choose a valid date." };
+  }
+
+  // Enforce the next-day cutoff for customers. Admins are exempt — they can
+  // write orders for any date. Server-authoritative: the picker's `min` is only
+  // a hint, so we re-check here (and it also catches a customer who lingered
+  // past the cutoff with the page open).
+  if (!isAdmin(user.email)) {
+    const settings = await getSettings();
+    if (settings.orderCutoffEnabled) {
+      const earliest = earliestFulfillmentDate(
+        new Date(),
+        settings.orderCutoffHour,
+      );
+      if (date < earliest) {
+        return {
+          error: `Ordering for that date has closed. The earliest available date is ${formatDateOnly(earliest)}.`,
+        };
+      }
+    }
   }
 
   // Resolve this user's customer record (the trust anchor — we own the user).

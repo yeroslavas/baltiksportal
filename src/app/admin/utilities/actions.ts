@@ -46,6 +46,16 @@ export async function updateSettings(
   }
   const businessAddress = String(formData.get("business_address") ?? "").trim();
 
+  // Next-day order cutoff (applies to customers only).
+  const cutoffEnabled = formData.get("order_cutoff_enabled") === "on";
+  const cutoffHour = Number(formData.get("order_cutoff_hour"));
+  if (!Number.isInteger(cutoffHour) || cutoffHour < 0 || cutoffHour > 23) {
+    return {
+      error: "Order cutoff time is invalid.",
+      success: null,
+    };
+  }
+
   const admin = createAdminClient();
   const { error } = await admin
     .from("app_settings")
@@ -55,6 +65,8 @@ export async function updateSettings(
       delivery_windows: windows,
       business_name: businessName,
       business_address: businessAddress,
+      order_cutoff_enabled: cutoffEnabled,
+      order_cutoff_hour: cutoffHour,
       updated_at: new Date().toISOString(),
     })
     .eq("id", 1);

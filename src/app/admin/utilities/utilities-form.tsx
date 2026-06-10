@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { updateSettings, type SettingsState } from "./actions";
+import { formatCutoffHour } from "@/lib/order-cutoff";
 import type { AppSettings } from "@/lib/settings";
 
 const initialState: SettingsState = { error: null, success: null };
@@ -109,6 +110,48 @@ export function UtilitiesForm({ settings }: { settings: AppSettings }) {
           Removing a window won’t change customers already assigned it — it just
           stops appearing as an option.
         </p>
+      </section>
+
+      <section className="space-y-4 border-t border-stone-200 pt-6">
+        <div>
+          <h2 className="font-semibold text-stone-900">Order cutoff</h2>
+          <p className="mt-1 text-sm text-stone-500">
+            When on, customers can’t order for the next day once the cutoff time
+            (Eastern) has passed — the earliest available date moves out by a
+            day. Admins are never restricted.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            id="order_cutoff_enabled"
+            type="checkbox"
+            name="order_cutoff_enabled"
+            defaultChecked={settings.orderCutoffEnabled}
+            className="h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-2 focus:ring-brand-200"
+          />
+          <label
+            htmlFor="order_cutoff_enabled"
+            className="text-sm font-medium text-stone-700"
+          >
+            Enforce a next-day order cutoff
+          </label>
+        </div>
+        <div className="flex flex-col gap-1.5 sm:max-w-xs">
+          <label className="text-sm font-medium text-stone-700">
+            Cutoff time (Eastern)
+          </label>
+          <select
+            name="order_cutoff_hour"
+            defaultValue={settings.orderCutoffHour}
+            className={inputClass}
+          >
+            {Array.from({ length: 24 }, (_, h) => (
+              <option key={h} value={h}>
+                {formatCutoffHour(h)}
+              </option>
+            ))}
+          </select>
+        </div>
       </section>
 
       <section className="space-y-4 border-t border-stone-200 pt-6">
