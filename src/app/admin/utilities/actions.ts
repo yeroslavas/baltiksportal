@@ -38,6 +38,14 @@ export async function updateSettings(
     windows.push(w);
   }
 
+  // Business identity for invoice PDFs. Name is required (it heads every
+  // invoice); address is optional.
+  const businessName = String(formData.get("business_name") ?? "").trim();
+  if (!businessName) {
+    return { error: "Business name is required.", success: null };
+  }
+  const businessAddress = String(formData.get("business_address") ?? "").trim();
+
   const admin = createAdminClient();
   const { error } = await admin
     .from("app_settings")
@@ -45,6 +53,8 @@ export async function updateSettings(
       delivery_fee: round2(fee),
       delivery_minimum: round2(minimum),
       delivery_windows: windows,
+      business_name: businessName,
+      business_address: businessAddress,
       updated_at: new Date().toISOString(),
     })
     .eq("id", 1);

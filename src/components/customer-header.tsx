@@ -51,6 +51,12 @@ export function CustomerHeader({
           >
             Standing
           </Link>
+          <Link
+            href="/invoices"
+            className="text-sm font-medium text-brand-700 hover:underline"
+          >
+            Invoices
+          </Link>
           <CartIndicator />
           {isAdminUser ? (
             <Link

@@ -9,6 +9,9 @@ export type AppSettings = {
   deliveryFee: number;
   deliveryMinimum: number;
   deliveryWindows: string[];
+  // Business identity printed at the top of invoice PDFs.
+  businessName: string;
+  businessAddress: string;
 };
 
 // Used until the row is read — and as a graceful fallback if the table/row is
@@ -17,6 +20,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   deliveryFee: 15.99,
   deliveryMinimum: 99,
   deliveryWindows: ["7:00–8:30 AM", "9:30–11:30 AM"],
+  businessName: "Baltik's Bagel",
+  businessAddress: "",
 };
 
 // Request-memoized so several consumers in one render share a single read.
@@ -24,17 +29,23 @@ export const getSettings = cache(async (): Promise<AppSettings> => {
   const admin = createAdminClient();
   const { data } = await admin
     .from("app_settings")
-    .select("delivery_fee, delivery_minimum, delivery_windows")
+    .select(
+      "delivery_fee, delivery_minimum, delivery_windows, business_name, business_address",
+    )
     .eq("id", 1)
     .maybeSingle<{
       delivery_fee: number;
       delivery_minimum: number;
       delivery_windows: string[] | null;
+      business_name: string | null;
+      business_address: string | null;
     }>();
   if (!data) return DEFAULT_SETTINGS;
   return {
     deliveryFee: Number(data.delivery_fee),
     deliveryMinimum: Number(data.delivery_minimum),
     deliveryWindows: data.delivery_windows ?? DEFAULT_SETTINGS.deliveryWindows,
+    businessName: data.business_name ?? DEFAULT_SETTINGS.businessName,
+    businessAddress: data.business_address ?? DEFAULT_SETTINGS.businessAddress,
   };
 });

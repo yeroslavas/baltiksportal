@@ -309,3 +309,77 @@ create unique index if not exists orders_standing_order_date_key
 
 alter table public.standing_orders      enable row level security;
 alter table public.standing_order_items enable row level security;
+
+-- ----------------------------------------------------------------------------
+-- Phase 3: Invoicing — business identity on app_settings
+--
+-- Name + address printed at the top of every invoice PDF. Admin-editable on the
+-- Utilities page, alongside the delivery settings. Added via alter (idempotent)
+-- so this section is safe to re-run on databases created in earlier phases.
+-- ----------------------------------------------------------------------------
+
+alter table public.app_settings
+  add column if not exists business_name text not null default 'Baltik''s Bagel';
+alter table public.app_settings
+  add column if not exists business_address text not null default '';
+
+-- Per-customer invoice payment terms: how many days after issue an invoice is
+-- due (net terms). Admin-editable on the customer edit page; the invoice
+-- generator reads it to set each invoice's due date. Internal — not granted to
+-- the customer API roles (customers still see the resulting due date per invoice).
+alter table public.customers
+  add column if not exists invoice_terms_days integer not null default 30
+  check (invoice_terms_days between 0 and 365);
+
+-- ----------------------------------------------------------------------------
+-- Phase 3: Invoices
+--
+-- One invoice per order (order_id is UNIQUE — that's the auto-generation
+-- idempotency guarantee). Line items are NOT duplicated here: the PDF and detail
+-- views read them from the linked order's order_items, which are already an
+-- immutable snapshot. total_amount is copied from the order at issue time.
+--
+-- invoice_number is human-readable (INV-0001, INV-0002, …). It's filled by a
+-- column DEFAULT off a dedicated sequence, so it's gap-tolerant, sequential, and
+-- assigned regardless of how the row is inserted — no app-side max() race.
+--
+-- Customers read their own invoices via the anon key + RLS (like orders). All
+-- writes (auto-generation, mark-paid, overdue sweep) happen server-side with the
+-- service_role key, which bypasses RLS — so there's only a read-own policy.
+-- ----------------------------------------------------------------------------
+
+create sequence if not exists public.invoice_number_seq start with 1;
+
+create table if not exists public.invoices (
+  id             uuid primary key default gen_random_uuid(),
+  invoice_number text not null unique
+                   default ('INV-' || lpad(nextval('public.invoice_number_seq')::text, 4, '0')),
+  customer_id    uuid not null references public.customers (id) on delete cascade,
+  order_id       uuid not null unique references public.orders (id) on delete cascade,
+  issue_date     date not null default current_date,
+  due_date       date not null default (current_date + 30),
+  status         text not null default 'unpaid'
+                   check (status in ('unpaid', 'paid', 'overdue')),
+  total_amount   numeric(10,2) not null default 0 check (total_amount >= 0),
+  -- Set when an admin marks the invoice paid; cleared if moved back to unpaid.
+  paid_at        timestamptz,
+  created_at     timestamptz not null default now()
+);
+
+create index if not exists idx_invoices_customer on public.invoices (customer_id);
+create index if not exists idx_invoices_status   on public.invoices (status);
+
+alter table public.invoices enable row level security;
+
+grant select on public.invoices to authenticated;
+
+-- A customer can read only their own invoices.
+drop policy if exists "read own invoices" on public.invoices;
+create policy "read own invoices"
+  on public.invoices for select
+  to authenticated
+  using (
+    customer_id in (
+      select id from public.customers where user_id = (select auth.uid())
+    )
+  );

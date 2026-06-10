@@ -111,6 +111,43 @@ export function UtilitiesForm({ settings }: { settings: AppSettings }) {
         </p>
       </section>
 
+      <section className="space-y-4 border-t border-stone-200 pt-6">
+        <div>
+          <h2 className="font-semibold text-stone-900">Business identity</h2>
+          <p className="mt-1 text-sm text-stone-500">
+            Printed at the top of every invoice PDF customers receive.
+          </p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-stone-700">
+            Business name
+          </label>
+          <input
+            name="business_name"
+            type="text"
+            required
+            defaultValue={settings.businessName}
+            placeholder="Baltik's Bagel"
+            className={inputClass}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-stone-700">
+            Business address
+          </label>
+          <textarea
+            name="business_address"
+            rows={3}
+            defaultValue={settings.businessAddress}
+            placeholder={"123 Main St\nBrooklyn, NY 11201"}
+            className={`${inputClass} resize-y`}
+          />
+          <p className="text-xs text-stone-500">
+            One line per row — appears under the business name on the invoice.
+          </p>
+        </div>
+      </section>
+
       {state.error ? (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
           {state.error}

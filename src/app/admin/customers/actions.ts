@@ -80,6 +80,15 @@ export async function updateCustomer(
   }
   if (!email) return { error: "Login email is required.", success: null };
 
+  // Net payment terms (days). Whole number, 0–365.
+  const termsDays = Number(get("invoice_terms_days"));
+  if (!Number.isInteger(termsDays) || termsDays < 0 || termsDays > 365) {
+    return {
+      error: "Payment terms must be a whole number of days between 0 and 365.",
+      success: null,
+    };
+  }
+
   const admin = createAdminClient();
 
   // Need user_id (for the login) and the current email (to detect a change).
@@ -123,6 +132,7 @@ export async function updateCustomer(
       notes: get("notes") || null,
       waive_delivery_minimum: formData.get("waive_delivery_minimum") === "on",
       allow_invoicing: formData.get("allow_invoicing") === "on",
+      invoice_terms_days: termsDays,
     })
     .eq("id", id);
   if (updateError) return { error: updateError.message, success: null };
