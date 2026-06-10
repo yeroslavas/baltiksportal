@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/lib/cart";
-import { formatPrice } from "@/lib/format";
+import { formatPrice, formatDateOnly } from "@/lib/format";
 import type { FulfillmentType } from "@/lib/types";
 import { placeOrder } from "./actions";
 
@@ -16,11 +16,14 @@ export function CheckoutView({
   deliveryWindow,
   deliveryFee: deliveryFeeRate,
   deliveryMinimum,
+  cutoff,
 }: {
   waiveDeliveryMinimum: boolean;
   deliveryWindow: string | null;
   deliveryFee: number;
   deliveryMinimum: number;
+  // Next-day cutoff floor + label; null for admins or when the cutoff is off.
+  cutoff: { earliestDate: string; label: string } | null;
 }) {
   const { items, total, clear } = useCart();
   const router = useRouter();
@@ -102,10 +105,17 @@ export function CheckoutView({
             <input
               type="date"
               required
+              min={cutoff?.earliestDate}
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className={inputClass}
             />
+            {cutoff ? (
+              <p className="text-xs text-stone-500">
+                Next-day orders close at {cutoff.label} ET. Earliest available:{" "}
+                {formatDateOnly(cutoff.earliestDate)}.
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-stone-700">

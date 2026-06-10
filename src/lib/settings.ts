@@ -12,6 +12,10 @@ export type AppSettings = {
   // Business identity printed at the top of invoice PDFs.
   businessName: string;
   businessAddress: string;
+  // Next-day order cutoff (business timezone). When enabled, customers can't
+  // order for tomorrow once the cutoff hour has passed — see src/lib/order-cutoff.ts.
+  orderCutoffEnabled: boolean;
+  orderCutoffHour: number; // 0–23
 };
 
 // Used until the row is read — and as a graceful fallback if the table/row is
@@ -22,6 +26,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   deliveryWindows: ["7:00–8:30 AM", "9:30–11:30 AM"],
   businessName: "Baltik's Bagel",
   businessAddress: "",
+  orderCutoffEnabled: true,
+  orderCutoffHour: 20,
 };
 
 // Request-memoized so several consumers in one render share a single read.
@@ -30,7 +36,7 @@ export const getSettings = cache(async (): Promise<AppSettings> => {
   const { data } = await admin
     .from("app_settings")
     .select(
-      "delivery_fee, delivery_minimum, delivery_windows, business_name, business_address",
+      "delivery_fee, delivery_minimum, delivery_windows, business_name, business_address, order_cutoff_enabled, order_cutoff_hour",
     )
     .eq("id", 1)
     .maybeSingle<{
@@ -39,6 +45,8 @@ export const getSettings = cache(async (): Promise<AppSettings> => {
       delivery_windows: string[] | null;
       business_name: string | null;
       business_address: string | null;
+      order_cutoff_enabled: boolean | null;
+      order_cutoff_hour: number | null;
     }>();
   if (!data) return DEFAULT_SETTINGS;
   return {
@@ -47,5 +55,9 @@ export const getSettings = cache(async (): Promise<AppSettings> => {
     deliveryWindows: data.delivery_windows ?? DEFAULT_SETTINGS.deliveryWindows,
     businessName: data.business_name ?? DEFAULT_SETTINGS.businessName,
     businessAddress: data.business_address ?? DEFAULT_SETTINGS.businessAddress,
+    orderCutoffEnabled:
+      data.order_cutoff_enabled ?? DEFAULT_SETTINGS.orderCutoffEnabled,
+    orderCutoffHour:
+      data.order_cutoff_hour ?? DEFAULT_SETTINGS.orderCutoffHour,
   };
 });

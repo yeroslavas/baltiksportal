@@ -332,6 +332,23 @@ alter table public.customers
   check (invoice_terms_days between 0 and 365);
 
 -- ----------------------------------------------------------------------------
+-- Order cutoff (next-day ordering window)
+--
+-- A global cutoff hour (business timezone, America/New_York) after which the
+-- next day closes for CUSTOMER ordering: before the cutoff the earliest
+-- fulfillment date is tomorrow; at/after it, tomorrow closes and the earliest
+-- is the day after. Enforced server-side on customer checkout only — admins and
+-- the standing-order generator are exempt. Hour granularity (0–23) matches the
+-- "8 PM" style cutoff. Read with the service_role key via src/lib/settings.ts.
+-- ----------------------------------------------------------------------------
+
+alter table public.app_settings
+  add column if not exists order_cutoff_enabled boolean not null default true;
+alter table public.app_settings
+  add column if not exists order_cutoff_hour smallint not null default 20
+  check (order_cutoff_hour between 0 and 23);
+
+-- ----------------------------------------------------------------------------
 -- Phase 3: Invoices
 --
 -- One invoice per order (order_id is UNIQUE — that's the auto-generation
