@@ -5,6 +5,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
+import { createInvoiceForOrder } from "@/lib/invoices";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -140,6 +141,22 @@ export async function createOrderForCustomer(opts: {
   if (itemsErr) {
     await admin.from("orders").delete().eq("id", order.id);
     return { error: itemsErr.message };
+  }
+
+  // Auto-generate the invoice. Best-effort: the order is the source of truth, so
+  // an invoicing failure never fails the order — an admin can regenerate it from
+  // the order page. Idempotent via the unique order_id (safe if this path or the
+  // generator runs twice).
+  const invoiceRes = await createInvoiceForOrder({
+    orderId: order.id,
+    customerId: customer.id,
+    total,
+    admin,
+  });
+  if (invoiceRes.outcome === "error") {
+    console.error(
+      `Invoice generation failed for order ${order.id}: ${invoiceRes.error}`,
+    );
   }
 
   return { orderId: order.id, orderNumber: order.order_number as number };

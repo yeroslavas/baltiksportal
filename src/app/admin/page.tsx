@@ -9,11 +9,16 @@ export default async function AdminDashboard() {
     { count: productCount },
     { count: orderCount },
     { count: standingOrderCount },
+    { count: unpaidInvoiceCount },
   ] = await Promise.all([
     admin.from("customers").select("*", { count: "exact", head: true }),
     admin.from("products").select("*", { count: "exact", head: true }),
     admin.from("orders").select("*", { count: "exact", head: true }),
     admin.from("standing_orders").select("*", { count: "exact", head: true }),
+    admin
+      .from("invoices")
+      .select("*", { count: "exact", head: true })
+      .in("status", ["unpaid", "overdue"]),
   ]);
 
   const cards = [
@@ -48,10 +53,16 @@ export default async function AdminDashboard() {
       blurb: "Recurring orders generated automatically.",
     },
     {
+      href: "/admin/invoices",
+      title: "Invoices",
+      value: unpaidInvoiceCount ?? 0,
+      blurb: "Outstanding invoices awaiting payment.",
+    },
+    {
       href: "/admin/utilities",
       title: "Utilities",
       value: "→",
-      blurb: "Delivery fee, delivery minimum, and time windows.",
+      blurb: "Delivery fee, delivery minimum, time windows, and business info.",
     },
   ];
 

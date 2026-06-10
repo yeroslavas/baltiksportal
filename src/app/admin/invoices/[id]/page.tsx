@@ -1,123 +1,125 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice, formatDate, formatDateOnly } from "@/lib/format";
-import { OrderStatusForm } from "../order-status-form";
-import { GenerateInvoiceButton } from "../generate-invoice-button";
-import { FulfillmentInfo } from "@/components/fulfillment-info";
-import { StandingOrderBadge } from "@/components/standing-order-badge";
-import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
+import { InvoiceStatusForm } from "../invoice-status-form";
 import type { Invoice, Order, OrderItem } from "@/lib/types";
 
-type OrderWithCustomer = Order & {
+type InvoiceWithRefs = Invoice & {
   customers: {
     business_name: string;
     contact_name: string | null;
     email: string | null;
+    address: string | null;
   } | null;
 };
 
-export default async function AdminOrderDetailPage({
+export default async function AdminInvoiceDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
   const admin = createAdminClient();
-  const { data: order } = await admin
-    .from("orders")
-    .select("*, customers(business_name, contact_name, email)")
+  const { data: invoice } = await admin
+    .from("invoices")
+    .select("*, customers(business_name, contact_name, email, address)")
     .eq("id", id)
-    .maybeSingle<OrderWithCustomer>();
+    .maybeSingle<InvoiceWithRefs>();
 
-  if (!order) {
+  if (!invoice) {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-bold tracking-tight text-stone-900">
-          Order not found
+          Invoice not found
         </h1>
         <Link
-          href="/admin/orders"
+          href="/admin/invoices"
           className="font-medium text-brand-700 hover:underline"
         >
-          ← Back to orders
+          ← Back to invoices
         </Link>
       </div>
     );
   }
 
-  const { data: itemsData } = await admin
-    .from("order_items")
-    .select("*")
-    .eq("order_id", id);
+  const [{ data: order }, { data: itemsData }] = await Promise.all([
+    admin
+      .from("orders")
+      .select("*")
+      .eq("id", invoice.order_id)
+      .maybeSingle<Order>(),
+    admin.from("order_items").select("*").eq("order_id", invoice.order_id),
+  ]);
   const items = (itemsData ?? []) as OrderItem[];
-
-  // The invoice auto-generated for this order (if any) — surfaces the admin
-  // "generate it" path when one is somehow missing.
-  const { data: invoice } = await admin
-    .from("invoices")
-    .select("*")
-    .eq("order_id", id)
-    .maybeSingle<Invoice>();
+  const deliveryFee = order?.delivery_fee ?? 0;
 
   return (
     <div className="space-y-8">
       <div>
         <Link
-          href="/admin/orders"
+          href="/admin/invoices"
           className="text-sm font-medium text-brand-700 hover:underline"
         >
-          ← Back to orders
+          ← Back to invoices
         </Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight text-stone-900">
-            Order #{order.order_number}
-            {order.standing_order_id ? <StandingOrderBadge /> : null}
+          <h1 className="text-2xl font-bold tracking-tight text-stone-900">
+            Invoice {invoice.invoice_number}
           </h1>
-          <OrderStatusForm id={order.id} status={order.status} />
+          <div className="flex items-center gap-3">
+            <InvoiceStatusForm id={invoice.id} status={invoice.status} />
+            <a
+              href={`/invoices/${invoice.id}/pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
+            >
+              Download PDF
+            </a>
+          </div>
         </div>
         <p className="mt-1 text-sm text-stone-500">
-          {order.customers?.business_name ?? "—"}
-          {order.customers?.contact_name
-            ? ` · ${order.customers.contact_name}`
+          {invoice.customers?.business_name ?? "—"}
+          {invoice.customers?.contact_name
+            ? ` · ${invoice.customers.contact_name}`
             : ""}
-          {order.customers?.email ? ` · ${order.customers.email}` : ""}
-          {" · "}
-          {formatDate(order.order_date)}
+          {invoice.customers?.email ? ` · ${invoice.customers.email}` : ""}
         </p>
       </div>
 
-      <FulfillmentInfo order={order} />
-
-      <section className="rounded-2xl border border-stone-200 bg-white px-6 py-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-semibold text-stone-900">Invoice</h2>
-            {invoice ? (
-              <p className="mt-1 text-sm text-stone-500">
-                {invoice.invoice_number} · Due{" "}
-                {formatDateOnly(invoice.due_date)}
-              </p>
-            ) : (
-              <p className="mt-1 text-sm text-stone-500">
-                No invoice exists for this order yet.
-              </p>
-            )}
-          </div>
-          {invoice ? (
-            <div className="flex items-center gap-3">
-              <InvoiceStatusBadge status={invoice.status} />
-              <Link
-                href={`/admin/invoices/${invoice.id}`}
-                className="text-sm font-medium text-brand-700 hover:underline"
-              >
-                View invoice
-              </Link>
-            </div>
+      <div className="grid grid-cols-2 gap-4 rounded-2xl border border-stone-200 bg-white px-6 py-4 text-sm shadow-sm sm:grid-cols-4">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-stone-400">Issued</p>
+          <p className="mt-1 font-medium text-stone-900">
+            {formatDateOnly(invoice.issue_date)}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-stone-400">Due</p>
+          <p className="mt-1 font-medium text-stone-900">
+            {formatDateOnly(invoice.due_date)}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-stone-400">Paid</p>
+          <p className="mt-1 font-medium text-stone-900">
+            {invoice.paid_at ? formatDate(invoice.paid_at) : "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-stone-400">Order</p>
+          {order ? (
+            <Link
+              href={`/admin/orders/${order.id}`}
+              className="mt-1 inline-block font-medium text-brand-700 hover:underline"
+            >
+              #{order.order_number}
+            </Link>
           ) : (
-            <GenerateInvoiceButton orderId={order.id} />
+            <p className="mt-1 font-medium text-stone-900">—</p>
           )}
         </div>
-      </section>
+      </div>
 
       <section className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm">
         <table className="w-full min-w-[36rem] text-left text-sm">
@@ -153,25 +155,25 @@ export default async function AdminOrderDetailPage({
                 Subtotal
               </td>
               <td className="px-6 py-2 text-right text-sm text-stone-900">
-                {formatPrice(order.total_amount - order.delivery_fee)}
+                {formatPrice(invoice.total_amount - deliveryFee)}
               </td>
             </tr>
-            {order.delivery_fee > 0 ? (
+            {deliveryFee > 0 ? (
               <tr>
                 <td colSpan={3} className="px-6 py-2 text-right text-sm text-stone-500">
                   Delivery fee
                 </td>
                 <td className="px-6 py-2 text-right text-sm text-stone-900">
-                  {formatPrice(order.delivery_fee)}
+                  {formatPrice(deliveryFee)}
                 </td>
               </tr>
             ) : null}
             <tr className="border-t border-stone-200">
               <td colSpan={3} className="px-6 py-3 text-right text-sm font-medium text-stone-700">
-                Total
+                Total due
               </td>
               <td className="px-6 py-3 text-right text-lg font-bold text-stone-900">
-                {formatPrice(order.total_amount)}
+                {formatPrice(invoice.total_amount)}
               </td>
             </tr>
           </tfoot>

@@ -11,8 +11,9 @@ export default async function UtilitiesPage() {
           Utilities
         </h1>
         <p className="mt-1 text-sm text-stone-500">
-          Operational settings — the delivery fee, the delivery minimum, and the
-          delivery/pickup windows offered to customers.
+          Operational settings — the delivery fee, the delivery minimum, the
+          delivery/pickup windows offered to customers, and the business identity
+          shown on invoices.
         </p>
       </div>
 

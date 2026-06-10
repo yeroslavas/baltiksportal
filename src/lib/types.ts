@@ -16,6 +16,8 @@ export type Customer = {
   notes: string | null;
   waive_delivery_minimum: boolean;
   allow_invoicing: boolean;
+  // Net payment terms: days after issue an invoice is due (default 30).
+  invoice_terms_days: number;
   created_at: string;
 };
 
@@ -113,5 +115,24 @@ export type StandingOrderItem = {
   standing_order_id: string;
   product_id: string;
   quantity: number;
+  created_at: string;
+};
+
+// Phase 3: Invoices. One per order; line items live on the linked order
+// (order_items), which is already an immutable snapshot — see supabase/schema.sql.
+export type InvoiceStatus = "unpaid" | "paid" | "overdue";
+
+export const INVOICE_STATUSES: InvoiceStatus[] = ["unpaid", "paid", "overdue"];
+
+export type Invoice = {
+  id: string;
+  invoice_number: string; // human-readable, e.g. "INV-0001"
+  customer_id: string;
+  order_id: string;
+  issue_date: string; // "YYYY-MM-DD"
+  due_date: string; // "YYYY-MM-DD" (default 30 days after issue)
+  status: InvoiceStatus;
+  total_amount: number;
+  paid_at: string | null;
   created_at: string;
 };

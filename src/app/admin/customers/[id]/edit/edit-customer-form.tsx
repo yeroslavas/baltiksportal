@@ -176,6 +176,26 @@ export function EditCustomerForm({
         </label>
       </div>
 
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-stone-700">
+          Payment terms (days)
+        </label>
+        <input
+          name="invoice_terms_days"
+          type="number"
+          min="0"
+          max="365"
+          step="1"
+          required
+          defaultValue={customer.invoice_terms_days}
+          className={inputClass}
+        />
+        <p className="text-xs text-stone-500">
+          Net days after issue an invoice is due (e.g. 30). Used when generating
+          this customer&apos;s invoices.
+        </p>
+      </div>
+
       {state.error ? (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-2">
           {state.error}
