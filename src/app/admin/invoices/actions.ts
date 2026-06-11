@@ -30,7 +30,8 @@ export async function setInvoiceStatus(formData: FormData) {
 
 export type OverdueState = { message: string | null; error: string | null };
 
-// Sweep unpaid, past-due invoices to "overdue". Manual for now (no cron).
+// Sweep unpaid, past-due invoices to "overdue". Manual fallback for the nightly
+// overdue-invoices cron.
 export async function recomputeOverdue(
   _prev: OverdueState,
   _formData: FormData,

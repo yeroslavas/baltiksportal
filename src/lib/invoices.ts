@@ -63,8 +63,8 @@ export async function createInvoiceForOrder(opts: {
 
 // Mark every still-unpaid invoice whose due date has passed as "overdue".
 // "Past due" means strictly before today in the business timezone (the due date
-// itself is the last day to pay). Returns how many rows were flipped. Triggered
-// manually by the admin for now (no cron yet).
+// itself is the last day to pay). Returns how many rows were flipped. Run nightly
+// by the overdue-invoices cron, and on demand from the admin Invoices button.
 export async function markOverdueInvoices(
   admin?: SupabaseClient,
 ): Promise<number> {
