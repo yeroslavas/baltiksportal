@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice, formatDateOnly } from "@/lib/format";
 import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/pagination";
+import { businessToday } from "@/lib/standing-orders";
 import { InvoiceStatusForm } from "./invoice-status-form";
 import { RecomputeOverdueButton } from "./recompute-overdue-button";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
@@ -53,6 +54,8 @@ export default async function AdminInvoicesPage({
     redirect(`/admin/invoices?page=${totalPages}`);
   }
 
+  const today = businessToday();
+
   const agg = (summaryRows as InvoiceSummary[] | null)?.[0];
   const summary = [
     {
@@ -85,6 +88,38 @@ export default async function AdminInvoicesPage({
           </div>
         ))}
       </div>
+
+      <form
+        action="/admin/invoices/day-pdf"
+        method="get"
+        className="flex flex-wrap items-end gap-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm"
+      >
+        <div className="flex flex-col gap-1.5">
+          <label
+            htmlFor="day-pdf-date"
+            className="text-sm font-medium text-stone-700"
+          >
+            Delivery prep — download a day&apos;s invoices
+          </label>
+          <input
+            id="day-pdf-date"
+            type="date"
+            name="date"
+            defaultValue={today}
+            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+          />
+        </div>
+        <button
+          type="submit"
+          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+        >
+          Download invoices
+        </button>
+        <p className="max-w-sm text-xs text-stone-500">
+          One PDF, one invoice per page — every non-canceled order fulfilled that
+          day, ordered by delivery window. Defaults to today.
+        </p>
+      </form>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-stone-500">
