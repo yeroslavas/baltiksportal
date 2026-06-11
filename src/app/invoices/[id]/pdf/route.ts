@@ -41,9 +41,17 @@ export async function GET(
     await Promise.all([
       db
         .from("orders")
-        .select("total_amount, delivery_fee")
+        .select(
+          "total_amount, delivery_fee, fulfillment_type, delivery_date, delivery_time",
+        )
         .eq("id", invoice.order_id)
-        .maybeSingle<{ total_amount: number; delivery_fee: number }>(),
+        .maybeSingle<{
+          total_amount: number;
+          delivery_fee: number;
+          fulfillment_type: "delivery" | "pickup";
+          delivery_date: string | null;
+          delivery_time: string | null;
+        }>(),
       db.from("order_items").select("*").eq("order_id", invoice.order_id),
       db
         .from("customers")

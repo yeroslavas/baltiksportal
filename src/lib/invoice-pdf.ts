@@ -14,11 +14,17 @@ import {
 } from "pdf-lib";
 import { formatPrice, formatDateOnly } from "@/lib/format";
 import { INVOICE_LOGO_PNG_BASE64 } from "@/lib/invoice-logo";
-import type { Invoice, OrderItem } from "@/lib/types";
+import type { FulfillmentType, Invoice, OrderItem } from "@/lib/types";
 
 export type InvoicePdfInput = {
   invoice: Invoice;
-  order: { total_amount: number; delivery_fee: number };
+  order: {
+    total_amount: number;
+    delivery_fee: number;
+    fulfillment_type: FulfillmentType;
+    delivery_date: string | null;
+    delivery_time: string | null;
+  };
   items: OrderItem[];
   customer: {
     business_name: string;
@@ -162,6 +168,15 @@ function drawInvoice(page: PDFPage, assets: Assets, input: InvoicePdfInput) {
     invoice.status.toUpperCase(),
     STATUS_COLORS[invoice.status],
   );
+  const fulfillmentLabel =
+    order.fulfillment_type === "pickup" ? "Pickup" : "Delivery";
+  metaLabel("Fulfillment", fulfillmentLabel);
+  if (order.delivery_date) {
+    metaLabel(`${fulfillmentLabel} date`, formatDateOnly(order.delivery_date));
+  }
+  if (order.delivery_time) {
+    metaLabel("Time window", order.delivery_time);
+  }
 
   // Drop below whichever column is lower, then a rule.
   y = Math.min(y, metaY) - 8;
