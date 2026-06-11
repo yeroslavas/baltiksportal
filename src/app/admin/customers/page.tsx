@@ -3,17 +3,30 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPhone } from "@/lib/format";
 import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/pagination";
+import { SortableHeader, type SortDir } from "@/components/sortable-header";
 import type { Customer } from "@/lib/types";
 import { CreateCustomerForm } from "./create-customer-form";
 import { ResetPasswordForm } from "./reset-password-form";
 
+const SORTS: Record<string, string> = {
+  business: "business_name",
+  contact: "contact_name",
+  email: "email",
+};
+
 export default async function AdminCustomersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; sort?: string; dir?: string }>;
 }) {
-  const { page: pageParam } = await searchParams;
+  const {
+    page: pageParam,
+    sort: sortParam,
+    dir: dirParam,
+  } = await searchParams;
   const page = Math.max(1, Math.floor(Number(pageParam)) || 1);
+  const sort = sortParam && SORTS[sortParam] ? sortParam : "business";
+  const dir: SortDir = dirParam === "desc" ? "desc" : "asc";
 
   const admin = createAdminClient();
   const from = (page - 1) * DEFAULT_PAGE_SIZE;
@@ -21,14 +34,14 @@ export default async function AdminCustomersPage({
   const { data, count } = await admin
     .from("customers")
     .select("*", { count: "exact" })
-    .order("business_name")
+    .order(SORTS[sort], { ascending: dir === "asc" })
     .range(from, to);
   const customers = (data ?? []) as Customer[];
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
 
   if (customers.length === 0 && total > 0 && page > totalPages) {
-    redirect(`/admin/customers?page=${totalPages}`);
+    redirect(`/admin/customers?sort=${sort}&dir=${dir}&page=${totalPages}`);
   }
 
   return (
@@ -59,9 +72,9 @@ export default async function AdminCustomersPage({
           <table className="w-full min-w-[44rem] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-stone-500">
               <tr className="border-b border-stone-200">
-                <th className="px-6 py-3">Business</th>
-                <th className="px-6 py-3">Contact</th>
-                <th className="px-6 py-3">Email</th>
+                <SortableHeader column="business" label="Business" sort={sort} dir={dir} basePath="/admin/customers" defaultDir="asc" />
+                <SortableHeader column="contact" label="Contact" sort={sort} dir={dir} basePath="/admin/customers" defaultDir="asc" />
+                <SortableHeader column="email" label="Email" sort={sort} dir={dir} basePath="/admin/customers" defaultDir="asc" />
                 <th className="px-6 py-3">Phone</th>
                 <th className="px-6 py-3"></th>
               </tr>
@@ -108,6 +121,7 @@ export default async function AdminCustomersPage({
         page={page}
         totalPages={totalPages}
         basePath="/admin/customers"
+        query={{ sort, dir }}
       />
     </div>
   );
