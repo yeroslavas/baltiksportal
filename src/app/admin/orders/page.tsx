@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice, formatDate } from "@/lib/format";
 import { OrderStatusForm } from "./order-status-form";
@@ -6,17 +7,35 @@ import { CancelOrderButton } from "./cancel-order-button";
 import { reinstateOrder } from "./actions";
 import { StatusBadge } from "@/components/status-badge";
 import { StandingOrderBadge } from "@/components/standing-order-badge";
+import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/pagination";
 import type { Order } from "@/lib/types";
 
 type OrderRow = Order & { customers: { business_name: string } | null };
 
-export default async function AdminOrdersPage() {
+export default async function AdminOrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page: pageParam } = await searchParams;
+  const page = Math.max(1, Math.floor(Number(pageParam)) || 1);
+
   const admin = createAdminClient();
-  const { data } = await admin
+  const from = (page - 1) * DEFAULT_PAGE_SIZE;
+  const to = from + DEFAULT_PAGE_SIZE - 1;
+  const { data, count } = await admin
     .from("orders")
-    .select("*, customers(business_name)")
-    .order("order_date", { ascending: false });
+    .select("*, customers(business_name)", { count: "exact" })
+    .order("order_date", { ascending: false })
+    .range(from, to);
   const orders = (data ?? []) as OrderRow[];
+  const total = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
+
+  // A manually-entered out-of-range page jumps to the last valid page.
+  if (orders.length === 0 && total > 0 && page > totalPages) {
+    redirect(`/admin/orders?page=${totalPages}`);
+  }
 
   return (
     <div className="space-y-8">
@@ -31,9 +50,9 @@ export default async function AdminOrdersPage() {
 
       <section className="rounded-2xl border border-stone-200 bg-white shadow-sm">
         <h2 className="border-b border-stone-200 px-6 py-4 font-semibold text-stone-900">
-          All orders ({orders.length})
+          All orders ({total})
         </h2>
-        {orders.length === 0 ? (
+        {total === 0 ? (
           <p className="px-6 py-8 text-sm text-stone-500">No orders yet.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -114,6 +133,8 @@ export default async function AdminOrdersPage() {
           </div>
         )}
       </section>
+
+      <Pagination page={page} totalPages={totalPages} basePath="/admin/orders" />
     </div>
   );
 }

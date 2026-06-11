@@ -370,6 +370,37 @@ alter table public.invoices add constraint invoices_status_check
   check (status in ('unpaid', 'paid', 'overdue', 'canceled'));
 
 -- ----------------------------------------------------------------------------
+-- Invoice summary (admin dashboard cards)
+--
+-- Computes the outstanding balance + unpaid/overdue counts across ALL invoices
+-- in the database. The admin invoices list is paginated, so these totals can't
+-- be derived from the visible page; a server-side aggregate stays accurate at
+-- any volume (and never hits the REST row cap). Called with the service_role
+-- key — execute is revoked from the customer API roles.
+-- ----------------------------------------------------------------------------
+
+create or replace function public.invoice_summary()
+returns table (
+  outstanding_total numeric,
+  unpaid_count bigint,
+  overdue_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select
+    coalesce(sum(total_amount) filter (where status in ('unpaid', 'overdue')), 0)::numeric,
+    count(*) filter (where status = 'unpaid'),
+    count(*) filter (where status = 'overdue')
+  from public.invoices;
+$$;
+
+revoke all on function public.invoice_summary() from public, anon, authenticated;
+grant execute on function public.invoice_summary() to service_role;
+
+-- ----------------------------------------------------------------------------
 -- Phase 3: Invoices
 --
 -- One invoice per order (order_id is UNIQUE — that's the auto-generation

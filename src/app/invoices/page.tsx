@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireUser, isAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { CustomerHeader } from "@/components/customer-header";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
+import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/pagination";
 import { formatPrice, formatDate, formatDateOnly } from "@/lib/format";
 import type { Invoice } from "@/lib/types";
 
@@ -10,7 +12,14 @@ import type { Invoice } from "@/lib/types";
 // the due date (the order's placement is the date a customer recognizes).
 type InvoiceRow = Invoice & { orders: { order_date: string } | null };
 
-export default async function InvoicesPage() {
+export default async function InvoicesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page: pageParam } = await searchParams;
+  const page = Math.max(1, Math.floor(Number(pageParam)) || 1);
+
   const user = await requireUser();
   const supabase = await createClient();
   const { data: customer } = await supabase
@@ -20,12 +29,21 @@ export default async function InvoicesPage() {
     .maybeSingle<{ business_name: string }>();
 
   // RLS limits this to the signed-in customer's own invoices.
-  const { data } = await supabase
+  const from = (page - 1) * DEFAULT_PAGE_SIZE;
+  const to = from + DEFAULT_PAGE_SIZE - 1;
+  const { data, count } = await supabase
     .from("invoices")
-    .select("*, orders(order_date)")
+    .select("*, orders(order_date)", { count: "exact" })
     .order("issue_date", { ascending: false })
-    .order("invoice_number", { ascending: false });
+    .order("invoice_number", { ascending: false })
+    .range(from, to);
   const invoices = (data ?? []) as InvoiceRow[];
+  const total = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
+
+  if (invoices.length === 0 && total > 0 && page > totalPages) {
+    redirect(`/invoices?page=${totalPages}`);
+  }
 
   return (
     <div className="flex flex-1 flex-col">
@@ -38,12 +56,13 @@ export default async function InvoicesPage() {
           Invoices
         </h1>
 
-        {invoices.length === 0 ? (
+        {total === 0 ? (
           <div className="mt-8 rounded-2xl border border-dashed border-stone-300 bg-white p-10 text-center text-stone-500">
             No invoices yet. They appear here once an order is placed.
           </div>
         ) : (
-          <ul className="mt-6 divide-y divide-stone-100 rounded-2xl border border-stone-200 bg-white">
+          <>
+            <ul className="mt-6 divide-y divide-stone-100 rounded-2xl border border-stone-200 bg-white">
             {invoices.map((inv) => (
               <li key={inv.id}>
                 <Link
@@ -70,7 +89,9 @@ export default async function InvoicesPage() {
                 </Link>
               </li>
             ))}
-          </ul>
+            </ul>
+            <Pagination page={page} totalPages={totalPages} basePath="/invoices" />
+          </>
         )}
       </main>
     </div>
