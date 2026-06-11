@@ -10,6 +10,16 @@ const initialState: SettingsState = { error: null, success: null };
 const inputClass =
   "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200";
 
+const WEEKDAYS = [
+  { iso: 1, label: "Mon" },
+  { iso: 2, label: "Tue" },
+  { iso: 3, label: "Wed" },
+  { iso: 4, label: "Thu" },
+  { iso: 5, label: "Fri" },
+  { iso: 6, label: "Sat" },
+  { iso: 7, label: "Sun" },
+];
+
 export function UtilitiesForm({ settings }: { settings: AppSettings }) {
   const [state, formAction, pending] = useActionState(
     updateSettings,
@@ -151,6 +161,36 @@ export function UtilitiesForm({ settings }: { settings: AppSettings }) {
               </option>
             ))}
           </select>
+        </div>
+      </section>
+
+      <section className="space-y-4 border-t border-stone-200 pt-6">
+        <div>
+          <h2 className="font-semibold text-stone-900">
+            Days available for orders
+          </h2>
+          <p className="mt-1 text-sm text-stone-500">
+            Customers can only choose a delivery/pickup date on a checked day.
+            Uncheck the days you&apos;re closed (e.g. Sundays). Admins aren&apos;t
+            restricted.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {WEEKDAYS.map((d) => (
+            <label
+              key={d.iso}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-800"
+            >
+              <input
+                type="checkbox"
+                name="available_day"
+                value={d.iso}
+                defaultChecked={settings.availableDays.includes(d.iso)}
+                className="h-3.5 w-3.5 rounded border-stone-300 text-brand-600 focus:ring-2 focus:ring-brand-200"
+              />
+              {d.label}
+            </label>
+          ))}
         </div>
       </section>
 

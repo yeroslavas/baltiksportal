@@ -11,12 +11,31 @@ import { placeOrder } from "./actions";
 const inputClass =
   "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200";
 
+const WEEKDAY_NAME = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+const WEEKDAY_ABBR = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+// ISO weekday (1=Mon … 7=Sun) of a "YYYY-MM-DD" string, timezone-safe.
+function isoWeekdayOf(dateStr: string): number {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return wd === 0 ? 7 : wd;
+}
+
 export function CheckoutView({
   waiveDeliveryMinimum,
   deliveryWindow,
   deliveryFee: deliveryFeeRate,
   deliveryMinimum,
   cutoff,
+  availableDays,
 }: {
   waiveDeliveryMinimum: boolean;
   deliveryWindow: string | null;
@@ -24,6 +43,8 @@ export function CheckoutView({
   deliveryMinimum: number;
   // Next-day cutoff floor + label; null for admins or when the cutoff is off.
   cutoff: { earliestDate: string; label: string } | null;
+  // Weekdays orders may be placed for (ISO 1–7); admins get all 7.
+  availableDays: number[];
 }) {
   const { items, total, clear } = useCart();
   const router = useRouter();
@@ -47,7 +68,15 @@ export function CheckoutView({
     );
   }
 
-  const ready = Boolean(date);
+  const pickedWeekday = date ? isoWeekdayOf(date) : null;
+  const dateClosed =
+    pickedWeekday !== null &&
+    availableDays.length > 0 &&
+    !availableDays.includes(pickedWeekday);
+  const closedDays = [1, 2, 3, 4, 5, 6, 7].filter(
+    (d) => !availableDays.includes(d),
+  );
+  const ready = Boolean(date) && !dateClosed;
   const noun = fulfillment === "pickup" ? "Pickup" : "Delivery";
   const deliveryFee =
     fulfillment === "delivery" &&
@@ -114,6 +143,16 @@ export function CheckoutView({
               <p className="text-xs text-stone-500">
                 Next-day orders close at {cutoff.label} ET. Earliest available:{" "}
                 {formatDateOnly(cutoff.earliestDate)}.
+              </p>
+            ) : null}
+            {dateClosed && pickedWeekday ? (
+              <p className="text-xs font-medium text-red-600">
+                We&apos;re closed on {WEEKDAY_NAME[pickedWeekday - 1]}s — please
+                pick another date.
+              </p>
+            ) : closedDays.length > 0 ? (
+              <p className="text-xs text-stone-500">
+                Closed: {closedDays.map((d) => WEEKDAY_ABBR[d - 1]).join(", ")}.
               </p>
             ) : null}
           </div>

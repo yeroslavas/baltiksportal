@@ -16,6 +16,8 @@ export type AppSettings = {
   // order for tomorrow once the cutoff hour has passed — see src/lib/order-cutoff.ts.
   orderCutoffEnabled: boolean;
   orderCutoffHour: number; // 0–23
+  // Weekdays the business takes orders for (ISO 1=Mon … 7=Sun).
+  availableDays: number[];
 };
 
 // Used until the row is read — and as a graceful fallback if the table/row is
@@ -28,6 +30,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   businessAddress: "",
   orderCutoffEnabled: true,
   orderCutoffHour: 20,
+  availableDays: [1, 2, 3, 4, 5, 6, 7],
 };
 
 // Request-memoized so several consumers in one render share a single read.
@@ -36,7 +39,7 @@ export const getSettings = cache(async (): Promise<AppSettings> => {
   const { data } = await admin
     .from("app_settings")
     .select(
-      "delivery_fee, delivery_minimum, delivery_windows, business_name, business_address, order_cutoff_enabled, order_cutoff_hour",
+      "delivery_fee, delivery_minimum, delivery_windows, business_name, business_address, order_cutoff_enabled, order_cutoff_hour, available_days",
     )
     .eq("id", 1)
     .maybeSingle<{
@@ -47,6 +50,7 @@ export const getSettings = cache(async (): Promise<AppSettings> => {
       business_address: string | null;
       order_cutoff_enabled: boolean | null;
       order_cutoff_hour: number | null;
+      available_days: number[] | null;
     }>();
   if (!data) return DEFAULT_SETTINGS;
   return {
@@ -59,5 +63,9 @@ export const getSettings = cache(async (): Promise<AppSettings> => {
       data.order_cutoff_enabled ?? DEFAULT_SETTINGS.orderCutoffEnabled,
     orderCutoffHour:
       data.order_cutoff_hour ?? DEFAULT_SETTINGS.orderCutoffHour,
+    availableDays:
+      data.available_days && data.available_days.length > 0
+        ? data.available_days
+        : DEFAULT_SETTINGS.availableDays,
   };
 });

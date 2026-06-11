@@ -348,6 +348,11 @@ alter table public.app_settings
   add column if not exists order_cutoff_hour smallint not null default 20
   check (order_cutoff_hour between 0 and 23);
 
+-- Weekdays the business accepts orders for (ISO: 1=Mon … 7=Sun). Customers can't
+-- pick a fulfillment date on a day not in this set (e.g. closed Sundays → drop 7).
+alter table public.app_settings
+  add column if not exists available_days int[] not null default '{1,2,3,4,5,6,7}';
+
 -- ----------------------------------------------------------------------------
 -- Order cancellation (soft)
 --

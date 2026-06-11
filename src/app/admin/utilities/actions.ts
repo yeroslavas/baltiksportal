@@ -56,6 +56,19 @@ export async function updateSettings(
     };
   }
 
+  // Weekdays the business takes orders for (ISO 1=Mon … 7=Sun).
+  const availableDays = [
+    ...new Set(
+      formData
+        .getAll("available_day")
+        .map((d) => parseInt(String(d), 10))
+        .filter((n) => n >= 1 && n <= 7),
+    ),
+  ].sort((a, b) => a - b);
+  if (availableDays.length === 0) {
+    return { error: "Select at least one available day.", success: null };
+  }
+
   const admin = createAdminClient();
   const { error } = await admin
     .from("app_settings")
@@ -67,6 +80,7 @@ export async function updateSettings(
       business_address: businessAddress,
       order_cutoff_enabled: cutoffEnabled,
       order_cutoff_hour: cutoffHour,
+      available_days: availableDays,
       updated_at: new Date().toISOString(),
     })
     .eq("id", 1);
