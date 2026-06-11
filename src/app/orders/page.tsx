@@ -1,13 +1,22 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireUser, isAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { CustomerHeader } from "@/components/customer-header";
 import { StatusBadge } from "@/components/status-badge";
 import { StandingOrderBadge } from "@/components/standing-order-badge";
+import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/pagination";
 import { formatPrice, formatDate } from "@/lib/format";
 import type { Order } from "@/lib/types";
 
-export default async function OrdersPage() {
+export default async function OrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page: pageParam } = await searchParams;
+  const page = Math.max(1, Math.floor(Number(pageParam)) || 1);
+
   const user = await requireUser();
   const supabase = await createClient();
   const { data: customer } = await supabase
@@ -16,12 +25,23 @@ export default async function OrdersPage() {
     .eq("user_id", user.id)
     .maybeSingle<{ business_name: string }>();
 
-  // RLS limits this to the signed-in customer's own orders.
-  const { data } = await supabase
+  // RLS limits this to the signed-in customer's own orders. count: "exact"
+  // returns the full total (ignoring the range) so we can page accurately.
+  const from = (page - 1) * DEFAULT_PAGE_SIZE;
+  const to = from + DEFAULT_PAGE_SIZE - 1;
+  const { data, count } = await supabase
     .from("orders")
-    .select("*")
-    .order("order_date", { ascending: false });
+    .select("*", { count: "exact" })
+    .order("order_date", { ascending: false })
+    .range(from, to);
   const orders = (data ?? []) as Order[];
+  const total = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
+
+  // A manually-entered out-of-range page jumps to the last valid page.
+  if (orders.length === 0 && total > 0 && page > totalPages) {
+    redirect(`/orders?page=${totalPages}`);
+  }
 
   return (
     <div className="flex flex-1 flex-col">
@@ -34,7 +54,7 @@ export default async function OrdersPage() {
           Order history
         </h1>
 
-        {orders.length === 0 ? (
+        {total === 0 ? (
           <div className="mt-8 rounded-2xl border border-dashed border-stone-300 bg-white p-10 text-center text-stone-500">
             No orders yet.{" "}
             <Link
@@ -46,7 +66,8 @@ export default async function OrdersPage() {
             .
           </div>
         ) : (
-          <ul className="mt-6 divide-y divide-stone-100 rounded-2xl border border-stone-200 bg-white">
+          <>
+            <ul className="mt-6 divide-y divide-stone-100 rounded-2xl border border-stone-200 bg-white">
             {orders.map((o) => (
               <li key={o.id}>
                 <Link
@@ -74,7 +95,9 @@ export default async function OrdersPage() {
                 </Link>
               </li>
             ))}
-          </ul>
+            </ul>
+            <Pagination page={page} totalPages={totalPages} basePath="/orders" />
+          </>
         )}
       </main>
     </div>

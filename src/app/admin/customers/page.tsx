@@ -1,17 +1,35 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPhone } from "@/lib/format";
+import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/pagination";
 import type { Customer } from "@/lib/types";
 import { CreateCustomerForm } from "./create-customer-form";
 import { ResetPasswordForm } from "./reset-password-form";
 
-export default async function AdminCustomersPage() {
+export default async function AdminCustomersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page: pageParam } = await searchParams;
+  const page = Math.max(1, Math.floor(Number(pageParam)) || 1);
+
   const admin = createAdminClient();
-  const { data } = await admin
+  const from = (page - 1) * DEFAULT_PAGE_SIZE;
+  const to = from + DEFAULT_PAGE_SIZE - 1;
+  const { data, count } = await admin
     .from("customers")
-    .select("*")
-    .order("business_name");
+    .select("*", { count: "exact" })
+    .order("business_name")
+    .range(from, to);
   const customers = (data ?? []) as Customer[];
+  const total = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
+
+  if (customers.length === 0 && total > 0 && page > totalPages) {
+    redirect(`/admin/customers?page=${totalPages}`);
+  }
 
   return (
     <div className="space-y-8">
@@ -32,9 +50,9 @@ export default async function AdminCustomersPage() {
 
       <section className="rounded-2xl border border-stone-200 bg-white shadow-sm">
         <h2 className="border-b border-stone-200 px-6 py-4 font-semibold text-stone-900">
-          All customers ({customers.length})
+          All customers ({total})
         </h2>
-        {customers.length === 0 ? (
+        {total === 0 ? (
           <p className="px-6 py-8 text-sm text-stone-500">No customers yet.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -85,6 +103,12 @@ export default async function AdminCustomersPage() {
           </div>
         )}
       </section>
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        basePath="/admin/customers"
+      />
     </div>
   );
 }

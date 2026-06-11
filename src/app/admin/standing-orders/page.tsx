@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDateOnly } from "@/lib/format";
 import {
@@ -6,29 +7,54 @@ import {
   formatSchedule,
   nextOccurrence,
 } from "@/lib/standing-orders";
+import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/pagination";
 import { RunGeneratorButton } from "./run-generator-button";
 import type { StandingOrder } from "@/lib/types";
 
 type Row = StandingOrder & { customers: { business_name: string } | null };
 
-export default async function StandingOrdersPage() {
+export default async function StandingOrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page: pageParam } = await searchParams;
+  const page = Math.max(1, Math.floor(Number(pageParam)) || 1);
+
   const admin = createAdminClient();
-  const [{ data }, { data: itemRows }] = await Promise.all([
-    admin
-      .from("standing_orders")
-      .select("*, customers(business_name)")
-      .order("created_at", { ascending: false }),
-    admin.from("standing_order_items").select("standing_order_id"),
-  ]);
+  const from = (page - 1) * DEFAULT_PAGE_SIZE;
+  const to = from + DEFAULT_PAGE_SIZE - 1;
+  const { data, count } = await admin
+    .from("standing_orders")
+    .select("*, customers(business_name)", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(from, to);
   const rows = (data ?? []) as Row[];
+  const total = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
+
+  if (rows.length === 0 && total > 0 && page > totalPages) {
+    redirect(`/admin/standing-orders?page=${totalPages}`);
+  }
+
   const today = businessToday();
 
+  // Item counts only for the standing orders shown on this page.
   const itemCount = new Map<string, number>();
-  for (const r of itemRows ?? []) {
-    itemCount.set(
-      r.standing_order_id,
-      (itemCount.get(r.standing_order_id) ?? 0) + 1,
-    );
+  if (rows.length > 0) {
+    const { data: itemRows } = await admin
+      .from("standing_order_items")
+      .select("standing_order_id")
+      .in(
+        "standing_order_id",
+        rows.map((r) => r.id),
+      );
+    for (const r of itemRows ?? []) {
+      itemCount.set(
+        r.standing_order_id,
+        (itemCount.get(r.standing_order_id) ?? 0) + 1,
+      );
+    }
   }
 
   return (
@@ -59,7 +85,7 @@ export default async function StandingOrdersPage() {
         </p>
       </div>
 
-      {rows.length === 0 ? (
+      {total === 0 ? (
         <p className="rounded-2xl border border-dashed border-stone-300 bg-white p-10 text-center text-sm text-stone-500">
           No standing orders yet. Create one to set up a recurring delivery.
         </p>
@@ -122,6 +148,12 @@ export default async function StandingOrdersPage() {
           </table>
         </div>
       )}
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        basePath="/admin/standing-orders"
+      />
     </div>
   );
 }
