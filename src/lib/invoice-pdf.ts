@@ -10,7 +10,6 @@ import {
   rgb,
   type PDFFont,
   type PDFImage,
-  type PDFPage,
 } from "pdf-lib";
 import { formatPrice, formatDateOnly } from "@/lib/format";
 import { INVOICE_LOGO_PNG_BASE64 } from "@/lib/invoice-logo";
@@ -71,7 +70,7 @@ async function embedAssets(doc: PDFDocument): Promise<Assets> {
 export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const assets = await embedAssets(doc);
-  drawInvoice(doc.addPage([PAGE_W, PAGE_H]), assets, input);
+  drawInvoice(doc, assets, input);
   return doc.save();
 }
 
@@ -94,46 +93,75 @@ export async function buildInvoicesPdf(
     return doc.save();
   }
   for (const input of inputs) {
-    drawInvoice(doc.addPage([PAGE_W, PAGE_H]), assets, input);
+    drawInvoice(doc, assets, input);
   }
   return doc.save();
 }
 
-// Draw a single invoice onto an existing page.
-function drawInvoice(page: PDFPage, assets: Assets, input: InvoicePdfInput) {
+// Draw a single invoice across one or more pages of `doc`. Paginates long item
+// lists onto continuation pages; the totals + footer stay together on the last.
+function drawInvoice(doc: PDFDocument, assets: Assets, input: InvoicePdfInput) {
   const { font, bold, logo } = assets;
   const { invoice, order, items, customer, business } = input;
 
+  let page = doc.addPage([PAGE_W, PAGE_H]);
+  let y = PAGE_H - MARGIN;
+  const topY = PAGE_H - MARGIN;
+  // Keep content clear of the footer, which sits at the very bottom.
+  const CONTENT_BOTTOM = MARGIN + 50;
+
+  // Drawing helpers operate on the CURRENT page (reassigned on a page break).
   const text = (
     s: string,
     x: number,
-    y: number,
+    yy: number,
     size: number,
     f: PDFFont = font,
     color = INK,
-  ) => page.drawText(s, { x, y, size, font: f, color });
+  ) => page.drawText(s, { x, y: yy, size, font: f, color });
 
   const textRight = (
     s: string,
     rightX: number,
-    y: number,
+    yy: number,
     size: number,
     f: PDFFont = font,
     color = INK,
   ) => {
     const w = f.widthOfTextAtSize(s, size);
-    page.drawText(s, { x: rightX - w, y, size, font: f, color });
+    page.drawText(s, { x: rightX - w, y: yy, size, font: f, color });
   };
 
-  const rule = (y: number, p: PDFPage = page) =>
-    p.drawLine({
-      start: { x: MARGIN, y },
-      end: { x: RIGHT, y },
+  const rule = (yy: number) =>
+    page.drawLine({
+      start: { x: MARGIN, y: yy },
+      end: { x: RIGHT, y: yy },
       thickness: 1,
       color: RULE,
     });
 
-  const topY = PAGE_H - MARGIN;
+  const drawTableHeader = () => {
+    text("ITEM", MARGIN, y, 9, bold, MUTED);
+    textRight("QTY", COL_QTY_R, y, 9, bold, MUTED);
+    textRight("UNIT PRICE", COL_UNIT_R, y, 9, bold, MUTED);
+    textRight("LINE TOTAL", COL_TOTAL_R, y, 9, bold, MUTED);
+    y -= 8;
+    rule(y);
+    y -= 18;
+  };
+
+  // Start a continuation page with a compact header; optionally repeat the
+  // line-item table header.
+  const continuePage = (withTableHeader: boolean) => {
+    page = doc.addPage([PAGE_W, PAGE_H]);
+    y = topY;
+    text(business.name, MARGIN, y - 10, 11, bold, MUTED);
+    textRight(`${invoice.invoice_number} (cont.)`, RIGHT, y - 10, 9, font, MUTED);
+    y -= 28;
+    rule(y);
+    y -= 18;
+    if (withTableHeader) drawTableHeader();
+  };
 
   // --- Masthead: logo (left) + "INVOICE" (right). -----------------------------
   const logoW = 135;
@@ -147,7 +175,7 @@ function drawInvoice(page: PDFPage, assets: Assets, input: InvoicePdfInput) {
   textRight("INVOICE", RIGHT, topY - 14, 24, bold, MUTED);
 
   // Business address sits under the logo.
-  let y = topY - logoH - 16;
+  y = topY - logoH - 16;
   for (const line of splitLines(business.address)) {
     text(line, MARGIN, y, 9.5, font, MUTED);
     y -= 13;
@@ -198,22 +226,20 @@ function drawInvoice(page: PDFPage, assets: Assets, input: InvoicePdfInput) {
   }
   y -= 18;
 
-  // --- Line-item table header. ------------------------------------------------
-  text("ITEM", MARGIN, y, 9, bold, MUTED);
-  textRight("QTY", COL_QTY_R, y, 9, bold, MUTED);
-  textRight("UNIT PRICE", COL_UNIT_R, y, 9, bold, MUTED);
-  textRight("LINE TOTAL", COL_TOTAL_R, y, 9, bold, MUTED);
-  y -= 8;
-  rule(y);
-  y -= 18;
-
-  // --- Line items. ------------------------------------------------------------
+  // --- Line-item table (paginates onto continuation pages). -------------------
+  drawTableHeader();
   for (const item of items) {
+    if (y < CONTENT_BOTTOM) continuePage(true);
     text(truncate(item.product_name, font, 10, ITEM_MAX_W), MARGIN, y, 10);
     textRight(String(item.quantity), COL_QTY_R, y, 10, font, INK);
     textRight(formatPrice(item.unit_price), COL_UNIT_R, y, 10, font, INK);
     textRight(formatPrice(item.line_total), COL_TOTAL_R, y, 10, font, INK);
     y -= 20;
+  }
+
+  // Keep the totals block together on the final page.
+  if (y - (order.delivery_fee > 0 ? 90 : 73) < CONTENT_BOTTOM) {
+    continuePage(false);
   }
 
   y -= 2;
