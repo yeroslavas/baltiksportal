@@ -432,11 +432,17 @@ create table if not exists public.invoices (
   total_amount   numeric(10,2) not null default 0 check (total_amount >= 0),
   -- Set when an admin marks the invoice paid; cleared if moved back to unpaid.
   paid_at        timestamptz,
+  -- Internal admin note for off-platform payments (e.g. a check #). Never shown
+  -- to the customer or on the PDF.
+  payment_note   text,
   created_at     timestamptz not null default now()
 );
 
 create index if not exists idx_invoices_customer on public.invoices (customer_id);
 create index if not exists idx_invoices_status   on public.invoices (status);
+
+-- Backfill payment_note on pre-existing databases (no-op on fresh installs).
+alter table public.invoices add column if not exists payment_note text;
 
 alter table public.invoices enable row level security;
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice, formatDate, formatDateOnly } from "@/lib/format";
 import { InvoiceStatusForm } from "../invoice-status-form";
+import { PaymentNoteForm } from "../payment-note-form";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import type { Invoice, Order, OrderItem } from "@/lib/types";
 
@@ -125,6 +126,10 @@ export default async function AdminInvoiceDetailPage({
           )}
         </div>
       </div>
+
+      <section className="rounded-2xl border border-stone-200 bg-white px-6 py-4 shadow-sm">
+        <PaymentNoteForm id={invoice.id} note={invoice.payment_note} />
+      </section>
 
       <section className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm">
         <table className="w-full min-w-[36rem] text-left text-sm">

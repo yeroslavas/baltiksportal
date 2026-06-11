@@ -28,6 +28,31 @@ export async function setInvoiceStatus(formData: FormData) {
   revalidatePath(`/admin/invoices/${id}`);
 }
 
+export type NoteState = { saved: boolean };
+
+// Save the internal payment note on an invoice (e.g. a check number). Blank
+// clears it. Admin-only; never exposed to the customer.
+export async function updateInvoiceNote(
+  _prev: NoteState,
+  formData: FormData,
+): Promise<NoteState> {
+  await requireAdmin();
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { saved: false };
+  const note = String(formData.get("payment_note") ?? "").trim();
+
+  const admin = createAdminClient();
+  await admin
+    .from("invoices")
+    .update({ payment_note: note || null })
+    .eq("id", id);
+
+  revalidatePath(`/admin/invoices/${id}`);
+  revalidatePath("/admin/invoices");
+  return { saved: true };
+}
+
 export type OverdueState = { message: string | null; error: string | null };
 
 // Sweep unpaid, past-due invoices to "overdue". Manual fallback for the nightly
