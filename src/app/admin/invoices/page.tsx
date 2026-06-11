@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice, formatDateOnly } from "@/lib/format";
 import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/pagination";
+import { SortableHeader, type SortDir } from "@/components/sortable-header";
 import { businessToday } from "@/lib/standing-orders";
 import { InvoiceStatusForm } from "./invoice-status-form";
 import { RecomputeOverdueButton } from "./recompute-overdue-button";
@@ -20,13 +21,29 @@ type InvoiceSummary = {
   overdue_count: number;
 };
 
+const SORTS: Record<string, string> = {
+  invoice: "invoice_number",
+  customer: "customers(business_name)",
+  order: "orders(order_number)",
+  issued: "issue_date",
+  due: "due_date",
+  total: "total_amount",
+  status: "status",
+};
+
 export default async function AdminInvoicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; sort?: string; dir?: string }>;
 }) {
-  const { page: pageParam } = await searchParams;
+  const {
+    page: pageParam,
+    sort: sortParam,
+    dir: dirParam,
+  } = await searchParams;
   const page = Math.max(1, Math.floor(Number(pageParam)) || 1);
+  const sort = sortParam && SORTS[sortParam] ? sortParam : "issued";
+  const dir: SortDir = dirParam === "asc" ? "asc" : "desc";
 
   const admin = createAdminClient();
   const from = (page - 1) * DEFAULT_PAGE_SIZE;
@@ -35,15 +52,17 @@ export default async function AdminInvoicesPage({
   // The list is paginated; the summary cards aggregate ALL invoices via a
   // server-side function, so they stay accurate regardless of the page (and
   // never hit the REST row cap).
+  let invQuery = admin
+    .from("invoices")
+    .select("*, customers(business_name), orders(order_number)", {
+      count: "exact",
+    })
+    .order(SORTS[sort], { ascending: dir === "asc" });
+  if (sort !== "invoice") {
+    invQuery = invQuery.order("invoice_number", { ascending: false }); // stable tiebreak
+  }
   const [{ data, count }, { data: summaryRows }] = await Promise.all([
-    admin
-      .from("invoices")
-      .select("*, customers(business_name), orders(order_number)", {
-        count: "exact",
-      })
-      .order("issue_date", { ascending: false })
-      .order("invoice_number", { ascending: false })
-      .range(from, to),
+    invQuery.range(from, to),
     admin.rpc("invoice_summary"),
   ]);
   const invoices = (data ?? []) as InvoiceRow[];
@@ -51,7 +70,7 @@ export default async function AdminInvoicesPage({
   const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
 
   if (invoices.length === 0 && total > 0 && page > totalPages) {
-    redirect(`/admin/invoices?page=${totalPages}`);
+    redirect(`/admin/invoices?sort=${sort}&dir=${dir}&page=${totalPages}`);
   }
 
   const today = businessToday();
@@ -143,13 +162,13 @@ export default async function AdminInvoicesPage({
             <table className="w-full min-w-[52rem] text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-stone-500">
                 <tr className="border-b border-stone-200">
-                  <th className="px-6 py-3">Invoice</th>
-                  <th className="px-6 py-3">Customer</th>
-                  <th className="px-6 py-3">Order</th>
-                  <th className="px-6 py-3">Issued</th>
-                  <th className="px-6 py-3">Due</th>
-                  <th className="px-6 py-3">Total</th>
-                  <th className="px-6 py-3">Status</th>
+                  <SortableHeader column="invoice" label="Invoice" sort={sort} dir={dir} basePath="/admin/invoices" defaultDir="desc" />
+                  <SortableHeader column="customer" label="Customer" sort={sort} dir={dir} basePath="/admin/invoices" defaultDir="asc" />
+                  <SortableHeader column="order" label="Order" sort={sort} dir={dir} basePath="/admin/invoices" defaultDir="desc" />
+                  <SortableHeader column="issued" label="Issued" sort={sort} dir={dir} basePath="/admin/invoices" defaultDir="desc" />
+                  <SortableHeader column="due" label="Due" sort={sort} dir={dir} basePath="/admin/invoices" defaultDir="asc" />
+                  <SortableHeader column="total" label="Total" sort={sort} dir={dir} basePath="/admin/invoices" defaultDir="desc" />
+                  <SortableHeader column="status" label="Status" sort={sort} dir={dir} basePath="/admin/invoices" defaultDir="asc" />
                   <th className="px-6 py-3"></th>
                 </tr>
               </thead>
@@ -204,6 +223,7 @@ export default async function AdminInvoicesPage({
         page={page}
         totalPages={totalPages}
         basePath="/admin/invoices"
+        query={{ sort, dir }}
       />
     </div>
   );

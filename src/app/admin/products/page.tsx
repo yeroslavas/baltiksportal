@@ -1,17 +1,34 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice } from "@/lib/format";
+import { SortableHeader, type SortDir } from "@/components/sortable-header";
 import type { Product } from "@/lib/types";
 import { CreateProductForm } from "./create-product-form";
 import { toggleProductActive } from "./actions";
 
-export default async function AdminProductsPage() {
+const SORTS: Record<string, string> = {
+  name: "name",
+  unit: "unit",
+  price: "base_price",
+  status: "is_active",
+};
+
+export default async function AdminProductsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string; dir?: string }>;
+}) {
+  const { sort: sortParam, dir: dirParam } = await searchParams;
+  const sort = sortParam && SORTS[sortParam] ? sortParam : "";
+  const dir: SortDir = dirParam === "desc" ? "desc" : "asc";
+
   const admin = createAdminClient();
-  const { data } = await admin
-    .from("products")
-    .select("*")
-    .order("sort_order", { ascending: true, nullsFirst: false })
-    .order("name");
+  let query = admin.from("products").select("*");
+  query = sort
+    ? query.order(SORTS[sort], { ascending: dir === "asc" })
+    : // Default: catalog order.
+      query.order("sort_order", { ascending: true, nullsFirst: false }).order("name");
+  const { data } = await query;
   const products = (data ?? []) as Product[];
 
   return (
@@ -44,10 +61,10 @@ export default async function AdminProductsPage() {
           <table className="w-full min-w-[40rem] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-stone-500">
               <tr className="border-b border-stone-200">
-                <th className="px-6 py-3">Name</th>
-                <th className="px-6 py-3">Unit</th>
-                <th className="px-6 py-3">Base price</th>
-                <th className="px-6 py-3">Status</th>
+                <SortableHeader column="name" label="Name" sort={sort} dir={dir} basePath="/admin/products" defaultDir="asc" />
+                <SortableHeader column="unit" label="Unit" sort={sort} dir={dir} basePath="/admin/products" defaultDir="asc" />
+                <SortableHeader column="price" label="Base price" sort={sort} dir={dir} basePath="/admin/products" defaultDir="desc" />
+                <SortableHeader column="status" label="Status" sort={sort} dir={dir} basePath="/admin/products" defaultDir="desc" />
                 <th className="px-6 py-3"></th>
               </tr>
             </thead>

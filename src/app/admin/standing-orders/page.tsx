@@ -8,18 +8,31 @@ import {
   nextOccurrence,
 } from "@/lib/standing-orders";
 import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/pagination";
+import { SortableHeader, type SortDir } from "@/components/sortable-header";
 import { RunGeneratorButton } from "./run-generator-button";
 import type { StandingOrder } from "@/lib/types";
 
 type Row = StandingOrder & { customers: { business_name: string } | null };
 
+// Only DB columns sort server-side; schedule/items/next-order are computed.
+const SORTS: Record<string, string> = {
+  customer: "customers(business_name)",
+  status: "is_active",
+};
+
 export default async function StandingOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; sort?: string; dir?: string }>;
 }) {
-  const { page: pageParam } = await searchParams;
+  const {
+    page: pageParam,
+    sort: sortParam,
+    dir: dirParam,
+  } = await searchParams;
   const page = Math.max(1, Math.floor(Number(pageParam)) || 1);
+  const sort = sortParam && SORTS[sortParam] ? sortParam : "";
+  const dir: SortDir = dirParam === "asc" ? "asc" : "desc";
 
   const admin = createAdminClient();
   const from = (page - 1) * DEFAULT_PAGE_SIZE;
@@ -27,14 +40,17 @@ export default async function StandingOrdersPage({
   const { data, count } = await admin
     .from("standing_orders")
     .select("*, customers(business_name)", { count: "exact" })
-    .order("created_at", { ascending: false })
+    .order(sort ? SORTS[sort] : "created_at", {
+      ascending: sort ? dir === "asc" : false,
+    })
     .range(from, to);
   const rows = (data ?? []) as Row[];
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
 
   if (rows.length === 0 && total > 0 && page > totalPages) {
-    redirect(`/admin/standing-orders?page=${totalPages}`);
+    const q = sort ? `sort=${sort}&dir=${dir}&` : "";
+    redirect(`/admin/standing-orders?${q}page=${totalPages}`);
   }
 
   const today = businessToday();
@@ -94,11 +110,11 @@ export default async function StandingOrdersPage({
           <table className="w-full text-left text-sm">
             <thead className="border-b border-stone-200 text-xs uppercase tracking-wide text-stone-400">
               <tr>
-                <th className="px-5 py-3 font-medium">Customer</th>
+                <SortableHeader column="customer" label="Customer" sort={sort} dir={dir} basePath="/admin/standing-orders" defaultDir="asc" className="px-5 py-3 font-medium" />
                 <th className="px-5 py-3 font-medium">Schedule</th>
                 <th className="px-5 py-3 font-medium">Items</th>
                 <th className="px-5 py-3 font-medium">Next order</th>
-                <th className="px-5 py-3 font-medium">Status</th>
+                <SortableHeader column="status" label="Status" sort={sort} dir={dir} basePath="/admin/standing-orders" defaultDir="desc" className="px-5 py-3 font-medium" />
                 <th className="px-5 py-3" />
               </tr>
             </thead>
@@ -153,6 +169,7 @@ export default async function StandingOrdersPage({
         page={page}
         totalPages={totalPages}
         basePath="/admin/standing-orders"
+        query={{ sort: sort || undefined, dir: sort ? dir : undefined }}
       />
     </div>
   );
