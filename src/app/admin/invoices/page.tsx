@@ -12,7 +12,7 @@ import type { Invoice } from "@/lib/types";
 
 type InvoiceRow = Invoice & {
   customers: { business_name: string } | null;
-  orders: { order_number: number } | null;
+  orders: { order_number: number; delivery_date: string | null } | null;
 };
 
 type InvoiceSummary = {
@@ -26,6 +26,7 @@ const SORTS: Record<string, string> = {
   customer: "customers(business_name)",
   order: "orders(order_number)",
   issued: "issue_date",
+  delivery: "orders(delivery_date)",
   due: "due_date",
   total: "total_amount",
   status: "status",
@@ -54,7 +55,7 @@ export default async function AdminInvoicesPage({
   // never hit the REST row cap).
   let invQuery = admin
     .from("invoices")
-    .select("*, customers(business_name), orders(order_number)", {
+    .select("*, customers(business_name), orders(order_number, delivery_date)", {
       count: "exact",
     })
     .order(SORTS[sort], { ascending: dir === "asc" });
@@ -166,6 +167,7 @@ export default async function AdminInvoicesPage({
                   <SortableHeader column="customer" label="Customer" sort={sort} dir={dir} basePath="/admin/invoices" defaultDir="asc" />
                   <SortableHeader column="order" label="Order" sort={sort} dir={dir} basePath="/admin/invoices" defaultDir="desc" />
                   <SortableHeader column="issued" label="Issued" sort={sort} dir={dir} basePath="/admin/invoices" defaultDir="desc" />
+                  <SortableHeader column="delivery" label="Delivery" sort={sort} dir={dir} basePath="/admin/invoices" defaultDir="asc" />
                   <SortableHeader column="due" label="Due" sort={sort} dir={dir} basePath="/admin/invoices" defaultDir="asc" />
                   <SortableHeader column="total" label="Total" sort={sort} dir={dir} basePath="/admin/invoices" defaultDir="desc" />
                   <SortableHeader column="status" label="Status" sort={sort} dir={dir} basePath="/admin/invoices" defaultDir="asc" />
@@ -189,6 +191,11 @@ export default async function AdminInvoicesPage({
                     </td>
                     <td className="px-6 py-3 text-stone-600">
                       {formatDateOnly(inv.issue_date)}
+                    </td>
+                    <td className="px-6 py-3 text-stone-600">
+                      {inv.orders?.delivery_date
+                        ? formatDateOnly(inv.orders.delivery_date)
+                        : "—"}
                     </td>
                     <td className="px-6 py-3 text-stone-600">
                       {formatDateOnly(inv.due_date)}
