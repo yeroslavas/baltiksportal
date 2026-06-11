@@ -5,7 +5,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createOrderForCustomer } from "@/lib/orders";
 import { getSettings } from "@/lib/settings";
 import { earliestFulfillmentDate } from "@/lib/order-cutoff";
+import { isoWeekday } from "@/lib/standing-orders";
 import { formatDateOnly } from "@/lib/format";
+
+const WEEKDAY_NAME = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 
 type CartLine = { productId: string; quantity: number };
 type Fulfillment = { type: string; date: string };
@@ -52,6 +63,15 @@ export async function placeOrder(
           error: `Ordering for that date has closed. The earliest available date is ${formatDateOnly(earliest)}.`,
         };
       }
+    }
+    // Reject dates on closed days (e.g. Sundays).
+    if (
+      settings.availableDays.length > 0 &&
+      !settings.availableDays.includes(isoWeekday(date))
+    ) {
+      return {
+        error: `We're closed on ${WEEKDAY_NAME[isoWeekday(date) - 1]}s. Please choose another date.`,
+      };
     }
   }
 

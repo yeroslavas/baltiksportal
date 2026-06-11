@@ -4,6 +4,7 @@ import { getSettings } from "@/lib/settings";
 import {
   earliestFulfillmentDate,
   formatCutoffHour,
+  nextAvailableDate,
 } from "@/lib/order-cutoff";
 import { CustomerHeader } from "@/components/customer-header";
 import { CheckoutView } from "./checkout-view";
@@ -14,17 +15,22 @@ export default async function CheckoutPage() {
   const userIsAdmin = isAdmin(user.email);
 
   // The cutoff restricts customers only. For admins (or when disabled) we pass
-  // null, so the picker has no floor and no cutoff note is shown.
+  // null, so the picker has no floor and no cutoff note is shown. The earliest
+  // date also skips closed days.
   const cutoff =
     settings.orderCutoffEnabled && !userIsAdmin
       ? {
-          earliestDate: earliestFulfillmentDate(
-            new Date(),
-            settings.orderCutoffHour,
+          earliestDate: nextAvailableDate(
+            earliestFulfillmentDate(new Date(), settings.orderCutoffHour),
+            settings.availableDays,
           ),
           label: formatCutoffHour(settings.orderCutoffHour),
         }
       : null;
+  // Days customers may pick (admins unrestricted → all days).
+  const availableDays = userIsAdmin
+    ? [1, 2, 3, 4, 5, 6, 7]
+    : settings.availableDays;
   // Service-role read, scoped to this user — waive_delivery_minimum is an
   // internal column the customer's own API key can't see.
   const admin = createAdminClient();
@@ -57,6 +63,7 @@ export default async function CheckoutPage() {
           deliveryFee={settings.deliveryFee}
           deliveryMinimum={settings.deliveryMinimum}
           cutoff={cutoff}
+          availableDays={availableDays}
         />
       </main>
     </div>

@@ -3,7 +3,12 @@
 // business timezone (America/New_York) — the same anchor the rest of the app
 // uses (see src/lib/standing-orders.ts).
 
-import { BUSINESS_TZ, businessToday, addDays } from "@/lib/standing-orders";
+import {
+  BUSINESS_TZ,
+  businessToday,
+  addDays,
+  isoWeekday,
+} from "@/lib/standing-orders";
 
 // Current hour (0–23) in the business timezone.
 export function businessHour(now: Date = new Date()): number {
@@ -27,6 +32,18 @@ export function earliestFulfillmentDate(
   const today = businessToday(now);
   const pastCutoff = businessHour(now) >= cutoffHour;
   return addDays(today, pastCutoff ? 2 : 1);
+}
+
+// Advance `from` (inclusive) to the next date whose weekday is an available
+// (open) day. Falls back to `from` if no day is available within two weeks.
+export function nextAvailableDate(from: string, availableDays: number[]): string {
+  if (availableDays.length === 0) return from;
+  let d = from;
+  for (let i = 0; i < 14; i++) {
+    if (availableDays.includes(isoWeekday(d))) return d;
+    d = addDays(d, 1);
+  }
+  return from;
 }
 
 // "20" -> "8:00 PM" for display in the checkout note and Utilities form.
