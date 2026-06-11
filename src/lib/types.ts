@@ -54,8 +54,10 @@ export type PricedProduct = Product & {
   has_custom_price: boolean;
 };
 
-export type OrderStatus = "pending" | "processing" | "fulfilled";
+export type OrderStatus = "pending" | "processing" | "fulfilled" | "canceled";
 
+// Fulfillment statuses shown in the admin status dropdown. "canceled" is set
+// only via the dedicated cancel action, so it's intentionally excluded here.
 export const ORDER_STATUSES: OrderStatus[] = [
   "pending",
   "processing",
@@ -120,8 +122,10 @@ export type StandingOrderItem = {
 
 // Phase 3: Invoices. One per order; line items live on the linked order
 // (order_items), which is already an immutable snapshot — see supabase/schema.sql.
-export type InvoiceStatus = "unpaid" | "paid" | "overdue";
+export type InvoiceStatus = "unpaid" | "paid" | "overdue" | "canceled";
 
+// Statuses the admin can set from the invoice dropdown. "canceled" is applied
+// only when its order is canceled, so it's excluded here.
 export const INVOICE_STATUSES: InvoiceStatus[] = ["unpaid", "paid", "overdue"];
 
 export type Invoice = {

@@ -2,8 +2,11 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice, formatDate, formatDateOnly } from "@/lib/format";
 import { OrderStatusForm } from "../order-status-form";
+import { CancelOrderButton } from "../cancel-order-button";
+import { reinstateOrder } from "../actions";
 import { GenerateInvoiceButton } from "../generate-invoice-button";
 import { FulfillmentInfo } from "@/components/fulfillment-info";
+import { StatusBadge } from "@/components/status-badge";
 import { StandingOrderBadge } from "@/components/standing-order-badge";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import type { Invoice, Order, OrderItem } from "@/lib/types";
@@ -73,7 +76,28 @@ export default async function AdminOrderDetailPage({
             Order #{order.order_number}
             {order.standing_order_id ? <StandingOrderBadge /> : null}
           </h1>
-          <OrderStatusForm id={order.id} status={order.status} />
+          {order.status === "canceled" ? (
+            <div className="flex items-center gap-3">
+              <StatusBadge status={order.status} />
+              <form action={reinstateOrder}>
+                <input type="hidden" name="id" value={order.id} />
+                <button
+                  type="submit"
+                  className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
+                >
+                  Reinstate
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <OrderStatusForm id={order.id} status={order.status} />
+              <CancelOrderButton
+                id={order.id}
+                className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
+              />
+            </div>
+          )}
         </div>
         <p className="mt-1 text-sm text-stone-500">
           {order.customers?.business_name ?? "—"}

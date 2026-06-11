@@ -6,6 +6,7 @@ const styles: Record<InvoiceStatus, string> = {
   unpaid: "bg-amber-100 text-amber-800",
   overdue: "bg-red-100 text-red-800",
   paid: "bg-green-100 text-green-800",
+  canceled: "bg-stone-200 text-stone-500 line-through",
 };
 
 export function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
