@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice, formatDate, formatDateOnly } from "@/lib/format";
 import { InvoiceStatusForm } from "../invoice-status-form";
 import { PaymentNoteForm } from "../payment-note-form";
+import { FulfillmentInfo } from "@/components/fulfillment-info";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import type { Invoice, Order, OrderItem } from "@/lib/types";
 
@@ -126,6 +127,8 @@ export default async function AdminInvoiceDetailPage({
           )}
         </div>
       </div>
+
+      {order ? <FulfillmentInfo order={order} /> : null}
 
       <section className="rounded-2xl border border-stone-200 bg-white px-6 py-4 shadow-sm">
         <PaymentNoteForm id={invoice.id} note={invoice.payment_note} />
