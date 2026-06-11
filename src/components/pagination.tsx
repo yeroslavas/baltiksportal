@@ -11,12 +11,22 @@ export function Pagination({
   page,
   totalPages,
   basePath,
+  query = {},
 }: {
   page: number;
   totalPages: number;
   basePath: string;
+  // Extra query params to preserve across page links (e.g. sort, dir).
+  query?: Record<string, string | undefined>;
 }) {
   if (totalPages <= 1) return null;
+
+  const href = (p: number) => {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(query)) if (v) params.set(k, v);
+    params.set("page", String(p));
+    return `${basePath}?${params.toString()}`;
+  };
 
   const linkClass =
     "rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 transition hover:bg-stone-100";
@@ -26,7 +36,7 @@ export function Pagination({
   return (
     <nav className="mt-6 flex items-center justify-between gap-4">
       {page > 1 ? (
-        <Link href={`${basePath}?page=${page - 1}`} className={linkClass}>
+        <Link href={href(page - 1)} className={linkClass}>
           ← Previous
         </Link>
       ) : (
@@ -36,7 +46,7 @@ export function Pagination({
         Page {page} of {totalPages}
       </span>
       {page < totalPages ? (
-        <Link href={`${basePath}?page=${page + 1}`} className={linkClass}>
+        <Link href={href(page + 1)} className={linkClass}>
           Next →
         </Link>
       ) : (
