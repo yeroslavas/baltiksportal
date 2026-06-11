@@ -4,7 +4,14 @@
 // runtime in the route handler). Returns the PDF as bytes.
 
 import "server-only";
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import {
+  PDFDocument,
+  StandardFonts,
+  rgb,
+  type PDFFont,
+  type PDFImage,
+  type PDFPage,
+} from "pdf-lib";
 import { formatPrice, formatDateOnly } from "@/lib/format";
 import { INVOICE_LOGO_PNG_BASE64 } from "@/lib/invoice-logo";
 import type { Invoice, OrderItem } from "@/lib/types";
@@ -44,13 +51,52 @@ const COL_UNIT_R = 460;
 const COL_TOTAL_R = RIGHT;
 const ITEM_MAX_W = COL_QTY_R - MARGIN - 60; // keep item clear of the qty column
 
-export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Array> {
-  const { invoice, order, items, customer, business } = input;
+type Assets = { font: PDFFont; bold: PDFFont; logo: PDFImage };
 
-  const doc = await PDFDocument.create();
-  const page = doc.addPage([PAGE_W, PAGE_H]);
+// Fonts + logo are embedded once per document and reused across pages.
+async function embedAssets(doc: PDFDocument): Promise<Assets> {
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const logo = await doc.embedPng(Buffer.from(INVOICE_LOGO_PNG_BASE64, "base64"));
+  return { font, bold, logo };
+}
+
+// One invoice → one page. Build a doc, embed shared assets, draw, save.
+export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const assets = await embedAssets(doc);
+  drawInvoice(doc.addPage([PAGE_W, PAGE_H]), assets, input);
+  return doc.save();
+}
+
+// Many invoices → one merged doc, one invoice per page (delivery-prep batch).
+export async function buildInvoicesPdf(
+  inputs: InvoicePdfInput[],
+): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const assets = await embedAssets(doc);
+  if (inputs.length === 0) {
+    doc
+      .addPage([PAGE_W, PAGE_H])
+      .drawText("No invoices for this date.", {
+        x: MARGIN,
+        y: PAGE_H - MARGIN - 20,
+        size: 14,
+        font: assets.bold,
+        color: INK,
+      });
+    return doc.save();
+  }
+  for (const input of inputs) {
+    drawInvoice(doc.addPage([PAGE_W, PAGE_H]), assets, input);
+  }
+  return doc.save();
+}
+
+// Draw a single invoice onto an existing page.
+function drawInvoice(page: PDFPage, assets: Assets, input: InvoicePdfInput) {
+  const { font, bold, logo } = assets;
+  const { invoice, order, items, customer, business } = input;
 
   const text = (
     s: string,
@@ -84,9 +130,6 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
   const topY = PAGE_H - MARGIN;
 
   // --- Masthead: logo (left) + "INVOICE" (right). -----------------------------
-  const logo = await doc.embedPng(
-    Buffer.from(INVOICE_LOGO_PNG_BASE64, "base64"),
-  );
   const logoW = 135;
   const logoH = (logo.height / logo.width) * logoW;
   page.drawImage(logo, {
@@ -193,8 +236,6 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
     `Payment due by ${formatDateOnly(invoice.due_date)}. Thank you for your business.`,
     { x: MARGIN, y: footY, size: 9, font, color: MUTED },
   );
-
-  return doc.save();
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
