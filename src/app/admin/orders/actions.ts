@@ -3,7 +3,61 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createOrderForCustomer } from "@/lib/orders";
 import { ORDER_STATUSES, type OrderStatus } from "@/lib/types";
+
+export type AdminOrderResult =
+  | { orderId: string; error?: undefined }
+  | { error: string; orderId?: undefined };
+
+// Place an order on a customer's behalf. Reuses the shared, server-authoritative
+// core (their pricing, fee rules, window snapshot, auto-invoice). Goes straight
+// through the core — so unlike customer checkout, it's not bound by the order
+// cutoff or closed-days rules (the admin is intentionally overriding).
+export async function createOrderAsAdmin(
+  customerId: string,
+  lines: { productId: string; quantity: number }[],
+  fulfillment: { type: string; date: string },
+): Promise<AdminOrderResult> {
+  await requireAdmin();
+
+  if (!customerId) return { error: "Choose a customer." };
+  const type =
+    fulfillment?.type === "pickup"
+      ? "pickup"
+      : fulfillment?.type === "delivery"
+        ? "delivery"
+        : null;
+  if (!type) return { error: "Choose delivery or pickup." };
+  const date = String(fulfillment?.date ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return { error: "Choose a valid date." };
+  }
+
+  const cleanLines = (Array.isArray(lines) ? lines : [])
+    .map((l) => ({
+      productId: String(l?.productId ?? ""),
+      quantity: Math.floor(Number(l?.quantity)),
+    }))
+    .filter((l) => l.productId && Number.isFinite(l.quantity) && l.quantity > 0);
+  if (cleanLines.length === 0) {
+    return { error: "Add at least one item with a quantity." };
+  }
+
+  const res = await createOrderForCustomer({
+    customerId,
+    lines: cleanLines,
+    type,
+    date,
+  });
+  if (res.error || !res.orderId) {
+    return { error: res.error ?? "Could not create the order." };
+  }
+
+  revalidatePath("/admin/orders");
+  revalidatePath("/admin");
+  return { orderId: res.orderId };
+}
 
 export async function updateOrderStatus(formData: FormData) {
   await requireAdmin();

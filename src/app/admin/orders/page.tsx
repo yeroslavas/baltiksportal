@@ -58,13 +58,21 @@ export default async function AdminOrdersPage({
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-stone-900">
-          Orders
-        </h1>
-        <p className="mt-1 text-sm text-stone-500">
-          Every customer order. Update status as it moves through fulfillment.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-stone-900">
+            Orders
+          </h1>
+          <p className="mt-1 text-sm text-stone-500">
+            Every customer order. Update status as it moves through fulfillment.
+          </p>
+        </div>
+        <Link
+          href="/admin/orders/new"
+          className="shrink-0 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+        >
+          Create order
+        </Link>
       </div>
 
       <section className="rounded-2xl border border-stone-200 bg-white shadow-sm">
