@@ -349,6 +349,27 @@ alter table public.app_settings
   check (order_cutoff_hour between 0 and 23);
 
 -- ----------------------------------------------------------------------------
+-- Order cancellation (soft)
+--
+-- Admins can cancel an order instead of deleting it: the order is marked
+-- 'canceled' and its invoice 'canceled' (voided — kept on record but excluded
+-- from outstanding balances and the overdue sweep). The record is preserved for
+-- audit, and a canceled standing-order instance stays in place so the nightly
+-- generator won't recreate it. Reinstating restores the order to 'pending' and
+-- the invoice to 'unpaid'.
+--
+-- These widen the existing status CHECKs (drop + re-add is idempotent on re-run).
+-- ----------------------------------------------------------------------------
+
+alter table public.orders drop constraint if exists orders_status_check;
+alter table public.orders add constraint orders_status_check
+  check (status in ('pending', 'processing', 'fulfilled', 'canceled'));
+
+alter table public.invoices drop constraint if exists invoices_status_check;
+alter table public.invoices add constraint invoices_status_check
+  check (status in ('unpaid', 'paid', 'overdue', 'canceled'));
+
+-- ----------------------------------------------------------------------------
 -- Phase 3: Invoices
 --
 -- One invoice per order (order_id is UNIQUE — that's the auto-generation

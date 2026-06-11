@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice, formatDate, formatDateOnly } from "@/lib/format";
 import { InvoiceStatusForm } from "../invoice-status-form";
+import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import type { Invoice, Order, OrderItem } from "@/lib/types";
 
 type InvoiceWithRefs = Invoice & {
@@ -67,7 +68,11 @@ export default async function AdminInvoiceDetailPage({
             Invoice {invoice.invoice_number}
           </h1>
           <div className="flex items-center gap-3">
-            <InvoiceStatusForm id={invoice.id} status={invoice.status} />
+            {invoice.status === "canceled" ? (
+              <InvoiceStatusBadge status={invoice.status} />
+            ) : (
+              <InvoiceStatusForm id={invoice.id} status={invoice.status} />
+            )}
             <a
               href={`/invoices/${invoice.id}/pdf`}
               target="_blank"

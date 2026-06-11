@@ -2,6 +2,9 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice, formatDate } from "@/lib/format";
 import { OrderStatusForm } from "./order-status-form";
+import { CancelOrderButton } from "./cancel-order-button";
+import { reinstateOrder } from "./actions";
+import { StatusBadge } from "@/components/status-badge";
 import { StandingOrderBadge } from "@/components/standing-order-badge";
 import type { Order } from "@/lib/types";
 
@@ -75,15 +78,34 @@ export default async function AdminOrdersPage() {
                       {formatPrice(o.total_amount)}
                     </td>
                     <td className="px-6 py-3">
-                      <OrderStatusForm id={o.id} status={o.status} />
+                      {o.status === "canceled" ? (
+                        <StatusBadge status={o.status} />
+                      ) : (
+                        <OrderStatusForm id={o.id} status={o.status} />
+                      )}
                     </td>
-                    <td className="px-6 py-3 text-right">
-                      <Link
-                        href={`/admin/orders/${o.id}`}
-                        className="font-medium text-brand-700 hover:underline"
-                      >
-                        View
-                      </Link>
+                    <td className="px-6 py-3">
+                      <div className="flex items-center justify-end gap-3">
+                        {o.status === "canceled" ? (
+                          <form action={reinstateOrder}>
+                            <input type="hidden" name="id" value={o.id} />
+                            <button
+                              type="submit"
+                              className="text-sm font-medium text-brand-700 hover:underline"
+                            >
+                              Reinstate
+                            </button>
+                          </form>
+                        ) : (
+                          <CancelOrderButton id={o.id} />
+                        )}
+                        <Link
+                          href={`/admin/orders/${o.id}`}
+                          className="font-medium text-brand-700 hover:underline"
+                        >
+                          View
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}

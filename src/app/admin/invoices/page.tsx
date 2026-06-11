@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice, formatDateOnly } from "@/lib/format";
 import { InvoiceStatusForm } from "./invoice-status-form";
 import { RecomputeOverdueButton } from "./recompute-overdue-button";
+import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import type { Invoice } from "@/lib/types";
 
 type InvoiceRow = Invoice & {
@@ -23,7 +24,7 @@ export default async function AdminInvoicesPage() {
   const unpaidCount = invoices.filter((i) => i.status === "unpaid").length;
   const overdueCount = invoices.filter((i) => i.status === "overdue").length;
   const outstanding = invoices
-    .filter((i) => i.status !== "paid")
+    .filter((i) => i.status === "unpaid" || i.status === "overdue")
     .reduce((sum, i) => sum + Number(i.total_amount), 0);
 
   const summary = [
@@ -112,7 +113,11 @@ export default async function AdminInvoicesPage() {
                       {formatPrice(inv.total_amount)}
                     </td>
                     <td className="px-6 py-3">
-                      <InvoiceStatusForm id={inv.id} status={inv.status} />
+                      {inv.status === "canceled" ? (
+                        <InvoiceStatusBadge status={inv.status} />
+                      ) : (
+                        <InvoiceStatusForm id={inv.id} status={inv.status} />
+                      )}
                     </td>
                     <td className="px-6 py-3 text-right">
                       <Link

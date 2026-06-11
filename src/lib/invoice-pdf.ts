@@ -35,6 +35,7 @@ const STATUS_COLORS = {
   paid: rgb(0.09, 0.5, 0.29),
   overdue: rgb(0.79, 0.16, 0.16),
   unpaid: rgb(0.72, 0.52, 0.04),
+  canceled: rgb(0.5, 0.47, 0.44),
 } as const;
 
 // Column right-edges for the line-item table (item name is left-aligned).
