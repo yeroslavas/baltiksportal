@@ -1,11 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser, isAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { CustomerHeader } from "@/components/customer-header";
-import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/pagination";
-import { formatPrice, formatDate, formatDateOnly } from "@/lib/format";
+import { InvoicePayList } from "./invoice-pay-list";
 import type { Invoice } from "@/lib/types";
 
 // The invoice list joins each invoice's order to show the order date alongside
@@ -15,9 +13,13 @@ type InvoiceRow = Invoice & { orders: { order_date: string } | null };
 export default async function InvoicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; paid?: string; payerror?: string }>;
 }) {
-  const { page: pageParam } = await searchParams;
+  const {
+    page: pageParam,
+    paid,
+    payerror,
+  } = await searchParams;
   const page = Math.max(1, Math.floor(Number(pageParam)) || 1);
 
   const user = await requireUser();
@@ -56,40 +58,38 @@ export default async function InvoicesPage({
           Invoices
         </h1>
 
+        {payerror ? (
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800">
+            <p className="font-semibold">We couldn&apos;t start the payment.</p>
+            <p className="mt-1 break-words">{payerror}</p>
+          </div>
+        ) : paid === "1" ? (
+          <div className="mt-4 rounded-2xl border border-green-200 bg-green-50 px-5 py-4 text-sm text-green-800">
+            <p className="font-semibold">Thank you — your payment was submitted.</p>
+            <p>
+              Card payments confirm right away; bank (ACH) transfers can take a
+              few business days to clear. Paid invoices update here once
+              confirmed.
+            </p>
+          </div>
+        ) : null}
+
         {total === 0 ? (
           <div className="mt-8 rounded-2xl border border-dashed border-stone-300 bg-white p-10 text-center text-stone-500">
             No invoices yet. They appear here once an order is placed.
           </div>
         ) : (
           <>
-            <ul className="mt-6 divide-y divide-stone-100 rounded-2xl border border-stone-200 bg-white">
-            {invoices.map((inv) => (
-              <li key={inv.id}>
-                <Link
-                  href={`/invoices/${inv.id}`}
-                  className="flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-stone-50"
-                >
-                  <div>
-                    <p className="font-semibold text-stone-900">
-                      {inv.invoice_number}
-                    </p>
-                    <p className="text-xs text-stone-500">
-                      {inv.orders?.order_date
-                        ? `Ordered ${formatDate(inv.orders.order_date)} · `
-                        : ""}
-                      Due {formatDateOnly(inv.due_date)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <InvoiceStatusBadge status={inv.status} />
-                    <span className="w-20 text-right font-semibold text-stone-900">
-                      {formatPrice(inv.total_amount)}
-                    </span>
-                  </div>
-                </Link>
-              </li>
-            ))}
-            </ul>
+            <InvoicePayList
+              invoices={invoices.map((inv) => ({
+                id: inv.id,
+                invoice_number: inv.invoice_number,
+                total_amount: Number(inv.total_amount),
+                status: inv.status,
+                due_date: inv.due_date,
+                order_date: inv.orders?.order_date ?? null,
+              }))}
+            />
             <Pagination page={page} totalPages={totalPages} basePath="/invoices" />
           </>
         )}

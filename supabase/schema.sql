@@ -247,6 +247,18 @@ create table if not exists public.pending_orders (
 alter table public.pending_orders enable row level security;
 -- No policies: created/consumed server-side with the service_role key only.
 
+-- Holds the set of invoices a customer chose to pay together in one Stripe
+-- Checkout, so the webhook knows which invoices to mark paid. Service-role only.
+create table if not exists public.payment_batches (
+  id          uuid primary key default gen_random_uuid(),
+  customer_id uuid not null references public.customers (id) on delete cascade,
+  invoice_ids uuid[] not null,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.payment_batches enable row level security;
+-- No policies: created server-side with the service_role key only.
+
 -- ----------------------------------------------------------------------------
 -- App settings (admin Utilities page)
 --

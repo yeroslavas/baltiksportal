@@ -111,44 +111,67 @@ async function materializePendingOrder(session: Stripe.Checkout.Session) {
   await admin.from("pending_orders").delete().eq("id", pendingId);
 }
 
-// Mark an invoice paid + email a receipt. Finds it by metadata.invoice_id
-// (pay-existing) or by the PaymentIntent tagged at materialization (pay-first).
+// Mark the invoice(s) this payment covers paid, + email one receipt. Finds them
+// by metadata.invoice_id (single), metadata.batch_id (bulk), or the PaymentIntent
+// tagged at materialization (pay-first). Idempotent.
 async function markPaid(session: Stripe.Checkout.Session) {
-  const invoiceId = session.metadata?.invoice_id;
   const pi = paymentIntentId(session);
+  const invoiceId = session.metadata?.invoice_id;
+  const batchId = session.metadata?.batch_id;
 
   const admin = createAdminClient();
-  let q = admin
+
+  let targetIds: string[] = [];
+  if (invoiceId) {
+    targetIds = [invoiceId];
+  } else if (batchId) {
+    const { data: batch } = await admin
+      .from("payment_batches")
+      .select("invoice_ids")
+      .eq("id", batchId)
+      .maybeSingle<{ invoice_ids: string[] }>();
+    targetIds = batch?.invoice_ids ?? [];
+  } else if (pi) {
+    // pay-first: the materialized invoice was tagged with this PaymentIntent.
+    const { data: tagged } = await admin
+      .from("invoices")
+      .select("id")
+      .eq("stripe_payment_id", pi);
+    targetIds = (tagged ?? []).map((t) => t.id);
+  }
+  if (targetIds.length === 0) return;
+
+  const { data: updated } = await admin
     .from("invoices")
     .update({
       status: "paid",
       paid_at: new Date().toISOString(),
       stripe_payment_id: pi,
     })
-    .in("status", ["unpaid", "overdue"]); // idempotent: no double-email
-  if (invoiceId) q = q.eq("id", invoiceId);
-  else if (pi) q = q.eq("stripe_payment_id", pi);
-  else return;
+    .in("id", targetIds)
+    .in("status", ["unpaid", "overdue"]) // idempotent: no double-email
+    .select("invoice_number, total_amount, customer_id");
+  const paid = updated ?? [];
+  if (paid.length === 0) return; // already paid / not found
 
-  const { data: updated } = await q
-    .select("invoice_number, total_amount, paid_at, customer_id")
-    .maybeSingle();
-  if (!updated) return; // already paid / not found
-
-  const [{ data: customer }, settings] = await Promise.all([
-    admin
-      .from("customers")
-      .select("email")
-      .eq("id", updated.customer_id)
-      .maybeSingle<{ email: string | null }>(),
-    getSettings(),
-  ]);
+  // One receipt summarising the payment (single invoice or the whole batch).
+  const settings = await getSettings();
+  const { data: customer } = await admin
+    .from("customers")
+    .select("email")
+    .eq("id", paid[0].customer_id)
+    .maybeSingle<{ email: string | null }>();
   if (customer?.email) {
+    const totalPaid = paid.reduce((s, r) => s + Number(r.total_amount), 0);
+    const label =
+      paid.length === 1
+        ? `Invoice ${paid[0].invoice_number}`
+        : `${paid.length} invoices`;
     await sendPaymentReceipt({
       to: customer.email,
-      invoiceNumber: updated.invoice_number,
-      amountDisplay: formatPrice(Number(updated.total_amount)),
-      dateDisplay: formatDate(updated.paid_at),
+      invoiceNumber: label,
+      amountDisplay: formatPrice(totalPaid),
+      dateDisplay: formatDate(new Date().toISOString()),
       businessName: settings.businessName,
     });
   }
