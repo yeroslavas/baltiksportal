@@ -13,6 +13,7 @@ export type GenerationSummary = {
   alreadyPresent: number; // due, but an order already existed (idempotent no-op)
   canceled: { orderId: string; date: string }[]; // pending orders removed (skipped/paused)
   skippedEmpty: string[]; // standing orders with no items
+  skippedLocked: string[]; // standing orders skipped — customer has overdue invoices
   errors: { standingOrderId: string; date: string; error: string }[];
 };
 
@@ -27,6 +28,7 @@ export async function generateStandingOrders(
     alreadyPresent: 0,
     canceled: [],
     skippedEmpty: [],
+    skippedLocked: [],
     errors: [],
   };
 
@@ -38,6 +40,17 @@ export async function generateStandingOrders(
   const active = (activeData ?? []) as StandingOrder[];
 
   if (active.length > 0) {
+    // Customers with overdue invoices are locked out of new orders — including
+    // auto-generated standing orders — until they pay.
+    const { data: overdueRows } = await admin
+      .from("invoices")
+      .select("customer_id")
+      .in("status", ["unpaid", "overdue"])
+      .lt("due_date", today);
+    const lockedCustomers = new Set(
+      (overdueRows ?? []).map((r) => r.customer_id),
+    );
+
     const { data: itemData } = await admin
       .from("standing_order_items")
       .select("*")
@@ -53,6 +66,10 @@ export async function generateStandingOrders(
     }
 
     for (const so of active) {
+      if (lockedCustomers.has(so.customer_id)) {
+        summary.skippedLocked.push(so.id);
+        continue;
+      }
       const lines = (itemsBySo.get(so.id) ?? []).map((i) => ({
         productId: i.product_id,
         quantity: i.quantity,

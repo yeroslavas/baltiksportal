@@ -202,6 +202,9 @@ export async function runGenerator(
   const extra: string[] = [];
   if (summary.alreadyPresent) extra.push(`${summary.alreadyPresent} already existed`);
   if (summary.canceled.length) extra.push(`${summary.canceled.length} canceled`);
+  if (summary.skippedLocked.length) {
+    extra.push(`${summary.skippedLocked.length} skipped (overdue)`);
+  }
   if (extra.length) message += ` (${extra.join(", ")})`;
 
   revalidatePath("/admin/standing-orders");

@@ -5,10 +5,11 @@ import { getUser, isAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createOrderForCustomer, priceOrder } from "@/lib/orders";
 import { getSettings } from "@/lib/settings";
+import { getOverdueInvoices } from "@/lib/invoices";
 import { earliestFulfillmentDate } from "@/lib/order-cutoff";
 import { isoWeekday } from "@/lib/standing-orders";
 import { getStripe } from "@/lib/stripe";
-import { formatDateOnly } from "@/lib/format";
+import { formatDateOnly, formatPrice } from "@/lib/format";
 
 const WEEKDAY_NAME = [
   "Monday",
@@ -100,6 +101,20 @@ export async function placeOrder(
     }>();
   if (!customer) {
     return { error: "No customer profile is linked to your account." };
+  }
+
+  // Credit lock: a customer with past-due invoices can't place new orders until
+  // they're paid (admins exempt). Unlock = pay them on the Invoices page.
+  if (!isAdmin(user.email)) {
+    const overdue = await getOverdueInvoices(customer.id, admin);
+    if (overdue.length > 0) {
+      const owed = overdue.reduce((s, i) => s + Number(i.total_amount), 0);
+      return {
+        error: `Your account has ${overdue.length} overdue invoice${
+          overdue.length > 1 ? "s" : ""
+        } (${formatPrice(owed)}). Please pay them on the Invoices page before placing a new order.`,
+      };
+    }
   }
 
   const cleanLines = lines.map((l) => ({

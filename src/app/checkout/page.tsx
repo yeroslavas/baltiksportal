@@ -7,6 +7,7 @@ import {
   nextAvailableDate,
 } from "@/lib/order-cutoff";
 import { CustomerHeader } from "@/components/customer-header";
+import { OverdueBanner } from "@/components/overdue-banner";
 import { CheckoutView } from "./checkout-view";
 
 export default async function CheckoutPage() {
@@ -53,6 +54,7 @@ export default async function CheckoutPage() {
         label={customer?.business_name ?? user.email ?? ""}
         isAdminUser={userIsAdmin}
       />
+      <OverdueBanner />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
         <h1 className="text-2xl font-bold tracking-tight text-stone-900">
           Review &amp; place order
