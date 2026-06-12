@@ -36,6 +36,7 @@ export function CheckoutView({
   deliveryMinimum,
   cutoff,
   availableDays,
+  requiresPayment,
 }: {
   waiveDeliveryMinimum: boolean;
   deliveryWindow: string | null;
@@ -45,6 +46,9 @@ export function CheckoutView({
   cutoff: { earliestDate: string; label: string } | null;
   // Weekdays orders may be placed for (ISO 1–7); admins get all 7.
   availableDays: number[];
+  // Customers without allow_invoicing must pay at checkout (order created on
+  // successful payment) rather than being invoiced.
+  requiresPayment: boolean;
 }) {
   const { items, total, clear } = useCart();
   const router = useRouter();
@@ -97,6 +101,11 @@ export function CheckoutView({
     if (res.error) {
       setError(res.error);
       setSubmitting(false);
+      return;
+    }
+    // Pay-first customers go to Stripe; the cart clears on the success page.
+    if (res.checkoutUrl) {
+      window.location.href = res.checkoutUrl;
       return;
     }
     clear();
@@ -216,6 +225,9 @@ export function CheckoutView({
       ) : null}
       <p className="text-xs text-stone-500">
         Final prices are confirmed at submission using your account pricing.
+        {requiresPayment
+          ? " Payment is required to place this order — you'll be taken to a secure payment page (bank transfer or card)."
+          : ""}
       </p>
 
       {error ? (
@@ -237,7 +249,13 @@ export function CheckoutView({
           disabled={!ready || submitting}
           className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
         >
-          {submitting ? "Placing order…" : "Confirm order"}
+          {submitting
+            ? requiresPayment
+              ? "Redirecting to payment…"
+              : "Placing order…"
+            : requiresPayment
+              ? "Pay & place order"
+              : "Confirm order"}
         </button>
       </div>
     </div>

@@ -1,7 +1,7 @@
-// Shared, server-authoritative order creation. Used by both customer checkout
-// and the standing-order generator, so pricing/fees/snapshots are computed in
-// exactly one place. Server-only (uses the service_role key) — never import
-// from a client component.
+// Shared, server-authoritative order pricing + creation. Used by customer
+// checkout, the admin create-order page, the standing-order generator, and the
+// pay-first flow — so pricing/fees/snapshots are computed in exactly one place.
+// Server-only (service_role key) — never import from a client component.
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
@@ -15,18 +15,36 @@ export type CreateOrderResult =
   | { orderId: string; orderNumber: number; error?: undefined }
   | { error: string; orderId?: undefined; orderNumber?: undefined };
 
-export async function createOrderForCustomer(opts: {
+type PricedItem = {
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+};
+
+export type PricedOrder = {
+  customer: {
+    id: string;
+    waive_delivery_minimum: boolean;
+    delivery_window: string | null;
+  };
+  items: PricedItem[];
+  subtotal: number;
+  deliveryFee: number;
+  total: number;
+};
+
+// Resolve a customer's order to concrete prices + fee + total, SERVER-SIDE, with
+// no writes. The Stripe amount (pay-first) and the created order both come from
+// this, so they can't drift.
+export async function priceOrder(opts: {
   customerId: string;
   lines: OrderLine[];
   type: "delivery" | "pickup";
-  date: string; // YYYY-MM-DD
-  // Set when generated from a standing order (links the order back to it).
-  standingOrderId?: string;
-  // Standing-order generation prefers to drop unavailable items rather than
-  // fail the whole order; checkout keeps the strict behavior (default).
   skipUnavailable?: boolean;
-}): Promise<CreateOrderResult> {
-  const { customerId, type, date, standingOrderId, skipUnavailable } = opts;
+}): Promise<PricedOrder | { error: string }> {
+  const { customerId, type, skipUnavailable } = opts;
   const admin = createAdminClient();
 
   const { data: customer } = await admin
@@ -71,13 +89,7 @@ export async function createOrderForCustomer(opts: {
   );
   const productById = new Map((products ?? []).map((p) => [p.id, p]));
 
-  const orderItems: {
-    product_id: string;
-    product_name: string;
-    quantity: number;
-    unit_price: number;
-    line_total: number;
-  }[] = [];
+  const items: PricedItem[] = [];
   for (const [productId, qty] of qtyByProduct) {
     const product = productById.get(productId);
     if (!product || !product.is_active) {
@@ -90,7 +102,7 @@ export async function createOrderForCustomer(opts: {
     const unitPrice = round2(
       overrides.get(productId) ?? Number(product.base_price),
     );
-    orderItems.push({
+    items.push({
       product_id: productId,
       product_name: product.name, // snapshot at order time
       quantity: qty,
@@ -98,11 +110,11 @@ export async function createOrderForCustomer(opts: {
       line_total: round2(unitPrice * qty),
     });
   }
-  if (orderItems.length === 0) {
+  if (items.length === 0) {
     return { error: "None of the items are currently available." };
   }
 
-  const subtotal = round2(orderItems.reduce((s, i) => s + i.line_total, 0));
+  const subtotal = round2(items.reduce((s, i) => s + i.line_total, 0));
   // Delivery fee applies only to delivery orders below the (admin-set) minimum,
   // unless the customer is exempt.
   const settings = await getSettings();
@@ -113,6 +125,33 @@ export async function createOrderForCustomer(opts: {
       ? settings.deliveryFee
       : 0;
   const total = round2(subtotal + deliveryFee);
+
+  return { customer, items, subtotal, deliveryFee, total };
+}
+
+export async function createOrderForCustomer(opts: {
+  customerId: string;
+  lines: OrderLine[];
+  type: "delivery" | "pickup";
+  date: string; // YYYY-MM-DD
+  // Set when generated from a standing order (links the order back to it).
+  standingOrderId?: string;
+  // Standing-order generation prefers to drop unavailable items rather than
+  // fail the whole order; checkout keeps the strict behavior (default).
+  skipUnavailable?: boolean;
+}): Promise<CreateOrderResult> {
+  const { type, date, standingOrderId } = opts;
+
+  const priced = await priceOrder({
+    customerId: opts.customerId,
+    lines: opts.lines,
+    type,
+    skipUnavailable: opts.skipUnavailable,
+  });
+  if ("error" in priced) return { error: priced.error };
+  const { customer, items: orderItems, deliveryFee, total } = priced;
+
+  const admin = createAdminClient();
 
   // Omit standing_order_id entirely when absent, so checkout doesn't depend on
   // that column existing (keeps this safe to deploy ahead of the migration).
@@ -145,8 +184,7 @@ export async function createOrderForCustomer(opts: {
 
   // Auto-generate the invoice. Best-effort: the order is the source of truth, so
   // an invoicing failure never fails the order — an admin can regenerate it from
-  // the order page. Idempotent via the unique order_id (safe if this path or the
-  // generator runs twice).
+  // the order page. Idempotent via the unique order_id.
   const invoiceRes = await createInvoiceForOrder({
     orderId: order.id,
     customerId: customer.id,
