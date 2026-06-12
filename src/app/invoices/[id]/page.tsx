@@ -5,14 +5,18 @@ import { CustomerHeader } from "@/components/customer-header";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import { FulfillmentInfo } from "@/components/fulfillment-info";
 import { formatPrice, formatDateOnly } from "@/lib/format";
+import { payInvoice } from "../actions";
 import type { Invoice, Order, OrderItem } from "@/lib/types";
 
 export default async function InvoiceDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ paid?: string }>;
 }) {
   const { id } = await params;
+  const { paid } = await searchParams;
   const user = await requireUser();
   const supabase = await createClient();
   const { data: customer } = await supabase
@@ -70,17 +74,39 @@ export default async function InvoiceDetailPage({
           ← Back to invoices
         </Link>
 
+        {paid === "1" ? (
+          <div className="mt-4 rounded-2xl border border-green-200 bg-green-50 px-5 py-4 text-sm text-green-800">
+            <p className="font-semibold">Thank you — your payment was submitted.</p>
+            <p>
+              Card payments confirm right away; bank (ACH) transfers can take a
+              few business days to clear. This invoice updates to Paid once it&apos;s
+              confirmed.
+            </p>
+          </div>
+        ) : null}
+
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold tracking-tight text-stone-900">
             Invoice {invoice.invoice_number}
           </h1>
           <div className="flex items-center gap-3">
             <InvoiceStatusBadge status={invoice.status} />
+            {invoice.status === "unpaid" || invoice.status === "overdue" ? (
+              <form action={payInvoice}>
+                <input type="hidden" name="invoice_id" value={invoice.id} />
+                <button
+                  type="submit"
+                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  Pay now
+                </button>
+              </form>
+            ) : null}
             <a
               href={`/invoices/${invoice.id}/pdf`}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+              className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
             >
               Download PDF
             </a>

@@ -440,6 +440,8 @@ create table if not exists public.invoices (
   -- Internal admin note for off-platform payments (e.g. a check #). Never shown
   -- to the customer or on the PDF.
   payment_note   text,
+  -- Stripe PaymentIntent id when paid online.
+  stripe_payment_id text,
   created_at     timestamptz not null default now()
 );
 
@@ -448,6 +450,9 @@ create index if not exists idx_invoices_status   on public.invoices (status);
 
 -- Backfill payment_note on pre-existing databases (no-op on fresh installs).
 alter table public.invoices add column if not exists payment_note text;
+-- Stripe PaymentIntent id, set when an invoice is paid online (paid_at already
+-- exists above). Reference back to the Stripe transaction.
+alter table public.invoices add column if not exists stripe_payment_id text;
 
 alter table public.invoices enable row level security;
 
