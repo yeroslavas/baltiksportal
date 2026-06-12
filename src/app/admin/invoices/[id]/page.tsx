@@ -112,6 +112,14 @@ export default async function AdminInvoiceDetailPage({
           <p className="mt-1 font-medium text-stone-900">
             {invoice.paid_at ? formatDate(invoice.paid_at) : "—"}
           </p>
+          {invoice.stripe_payment_id ? (
+            <p
+              className="mt-0.5 truncate text-[11px] text-stone-400"
+              title={invoice.stripe_payment_id}
+            >
+              Stripe: {invoice.stripe_payment_id}
+            </p>
+          ) : null}
         </div>
         <div>
           <p className="text-xs uppercase tracking-wide text-stone-400">Order</p>

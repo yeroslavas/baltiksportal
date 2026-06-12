@@ -140,5 +140,7 @@ export type Invoice = {
   paid_at: string | null;
   // Internal admin note for off-platform payments (e.g. check #).
   payment_note: string | null;
+  // Stripe PaymentIntent id when paid online (reference back to the transaction).
+  stripe_payment_id: string | null;
   created_at: string;
 };
