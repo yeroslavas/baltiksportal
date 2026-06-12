@@ -91,3 +91,82 @@ export async function payInvoice(formData: FormData) {
     `/invoices/${id}?payerror=${encodeURIComponent(payError ?? "Could not start the payment.")}`,
   );
 }
+
+// Pay several invoices in one Stripe Checkout. Validates each belongs to the
+// customer and is payable; the webhook marks them all paid via the batch record.
+export async function payInvoices(formData: FormData) {
+  const user = await getUser();
+  if (!user) redirect("/login");
+  const ids = formData.getAll("invoice_ids").map(String).filter(Boolean);
+  if (ids.length === 0) redirect("/invoices");
+
+  const admin = createAdminClient();
+  const { data: customer } = await admin
+    .from("customers")
+    .select("id, email")
+    .eq("user_id", user.id)
+    .maybeSingle<{ id: string; email: string | null }>();
+  if (!customer) redirect("/invoices");
+
+  // Only this customer's own, still-payable invoices.
+  const { data: invoiceData } = await admin
+    .from("invoices")
+    .select("id, invoice_number, total_amount")
+    .in("id", ids)
+    .eq("customer_id", customer.id)
+    .in("status", ["unpaid", "overdue"]);
+  const payable = invoiceData ?? [];
+  if (payable.length === 0) redirect("/invoices");
+
+  const { data: batch, error: batchErr } = await admin
+    .from("payment_batches")
+    .insert({ customer_id: customer.id, invoice_ids: payable.map((i) => i.id) })
+    .select("id")
+    .single();
+  if (batchErr || !batch) {
+    redirect(
+      `/invoices?payerror=${encodeURIComponent(batchErr?.message ?? "Could not start the payment.")}`,
+    );
+  }
+
+  const h = await headers();
+  const host = h.get("host") ?? "";
+  const proto =
+    h.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
+  const origin = `${proto}://${host}`;
+
+  let checkoutUrl: string | null = null;
+  let payError: string | null = null;
+  try {
+    const session = await getStripe().checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["us_bank_account", "card"],
+      customer_creation: "always",
+      customer_email: customer.email ?? undefined,
+      line_items: payable.map((i) => ({
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: Math.round(Number(i.total_amount) * 100),
+          product_data: { name: `Invoice ${i.invoice_number}` },
+        },
+      })),
+      metadata: { batch_id: batch.id },
+      payment_intent_data: { metadata: { batch_id: batch.id } },
+      success_url: `${origin}/invoices?paid=1`,
+      cancel_url: `${origin}/invoices`,
+    });
+    checkoutUrl = session.url;
+  } catch (e) {
+    console.error("Bulk-pay checkout session creation failed:", e);
+    payError = e instanceof Error ? e.message : "Could not start the payment.";
+  }
+
+  if (!checkoutUrl) {
+    await admin.from("payment_batches").delete().eq("id", batch.id);
+    redirect(
+      `/invoices?payerror=${encodeURIComponent(payError ?? "Could not start the payment.")}`,
+    );
+  }
+  redirect(checkoutUrl);
+}
