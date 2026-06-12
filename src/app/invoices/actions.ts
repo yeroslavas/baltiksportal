@@ -45,37 +45,49 @@ export async function payInvoice(formData: FormData) {
     h.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
   const origin = `${proto}://${host}`;
 
-  const session = await getStripe().checkout.sessions.create({
-    mode: "payment",
-    // ACH first (preferred), then card.
-    payment_method_types: ["us_bank_account", "card"],
-    // ACH debits need a Customer to hold the mandate.
-    customer_creation: "always",
-    customer_email: customer.email ?? undefined,
-    line_items: [
-      {
-        quantity: 1,
-        price_data: {
-          currency: "usd",
-          unit_amount: Math.round(Number(invoice.total_amount) * 100),
-          product_data: { name: `Invoice ${invoice.invoice_number}` },
+  // Create the session in a try/catch and capture the result; the redirect()
+  // calls MUST be outside the try (redirect throws, which a catch would swallow).
+  let checkoutUrl: string | null = null;
+  let payError: string | null = null;
+  try {
+    const session = await getStripe().checkout.sessions.create({
+      mode: "payment",
+      // ACH first (preferred), then card.
+      payment_method_types: ["us_bank_account", "card"],
+      // ACH debits need a Customer to hold the mandate.
+      customer_creation: "always",
+      customer_email: customer.email ?? undefined,
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: Math.round(Number(invoice.total_amount) * 100),
+            product_data: { name: `Invoice ${invoice.invoice_number}` },
+          },
         },
-      },
-    ],
-    metadata: {
-      invoice_id: invoice.id,
-      invoice_number: invoice.invoice_number,
-    },
-    payment_intent_data: {
+      ],
       metadata: {
         invoice_id: invoice.id,
         invoice_number: invoice.invoice_number,
       },
-    },
-    success_url: `${origin}/invoices/${id}?paid=1`,
-    cancel_url: `${origin}/invoices/${id}`,
-  });
+      payment_intent_data: {
+        metadata: {
+          invoice_id: invoice.id,
+          invoice_number: invoice.invoice_number,
+        },
+      },
+      success_url: `${origin}/invoices/${id}?paid=1`,
+      cancel_url: `${origin}/invoices/${id}`,
+    });
+    checkoutUrl = session.url;
+  } catch (e) {
+    console.error("Stripe checkout session creation failed:", e);
+    payError = e instanceof Error ? e.message : "Could not start the payment.";
+  }
 
-  if (!session.url) redirect(`/invoices/${id}`);
-  redirect(session.url);
+  if (checkoutUrl) redirect(checkoutUrl);
+  redirect(
+    `/invoices/${id}?payerror=${encodeURIComponent(payError ?? "Could not start the payment.")}`,
+  );
 }

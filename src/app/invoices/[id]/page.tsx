@@ -13,10 +13,10 @@ export default async function InvoiceDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ paid?: string }>;
+  searchParams: Promise<{ paid?: string; payerror?: string }>;
 }) {
   const { id } = await params;
-  const { paid } = await searchParams;
+  const { paid, payerror } = await searchParams;
   const user = await requireUser();
   const supabase = await createClient();
   const { data: customer } = await supabase
@@ -73,6 +73,13 @@ export default async function InvoiceDetailPage({
         >
           ← Back to invoices
         </Link>
+
+        {payerror ? (
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800">
+            <p className="font-semibold">We couldn&apos;t start the payment.</p>
+            <p className="mt-1 break-words">{payerror}</p>
+          </div>
+        ) : null}
 
         {paid === "1" ? (
           <div className="mt-4 rounded-2xl border border-green-200 bg-green-50 px-5 py-4 text-sm text-green-800">
