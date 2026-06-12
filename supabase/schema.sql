@@ -227,6 +227,27 @@ create policy "read own order items"
   );
 
 -- ----------------------------------------------------------------------------
+-- Pending orders (pay-first checkout)
+--
+-- A customer WITHOUT allow_invoicing must pay at checkout; the real order isn't
+-- created until payment is authorized. This row holds the cart between starting
+-- Stripe Checkout and the webhook that materializes the order. Service-role only.
+-- ----------------------------------------------------------------------------
+
+create table if not exists public.pending_orders (
+  id               uuid primary key default gen_random_uuid(),
+  customer_id      uuid not null references public.customers (id) on delete cascade,
+  lines            jsonb not null, -- [{ productId, quantity }]
+  fulfillment_type text not null default 'delivery'
+                     check (fulfillment_type in ('delivery', 'pickup')),
+  delivery_date    date not null,
+  created_at       timestamptz not null default now()
+);
+
+alter table public.pending_orders enable row level security;
+-- No policies: created/consumed server-side with the service_role key only.
+
+-- ----------------------------------------------------------------------------
 -- App settings (admin Utilities page)
 --
 -- A single pinned row (id = 1) holding admin-editable operational settings:
