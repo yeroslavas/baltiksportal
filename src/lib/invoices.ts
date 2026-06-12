@@ -81,3 +81,25 @@ export async function markOverdueInvoices(
   if (error) throw new Error(error.message);
   return data?.length ?? 0;
 }
+
+// A customer's past-due invoices — the LIVE "overdue debt" check (due date has
+// passed, still unpaid/overdue), independent of the nightly sweep so it's
+// accurate the moment a due date lapses. Used to lock delinquent customers out
+// of placing new orders (manual checkout + standing-order generation).
+export async function getOverdueInvoices(
+  customerId: string,
+  admin?: SupabaseClient,
+): Promise<
+  { id: string; invoice_number: string; total_amount: number; due_date: string }[]
+> {
+  const client = admin ?? createAdminClient();
+  const today = businessToday();
+  const { data } = await client
+    .from("invoices")
+    .select("id, invoice_number, total_amount, due_date")
+    .eq("customer_id", customerId)
+    .in("status", ["unpaid", "overdue"])
+    .lt("due_date", today)
+    .order("due_date");
+  return data ?? [];
+}

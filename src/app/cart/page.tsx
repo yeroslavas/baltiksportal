@@ -2,6 +2,7 @@ import { requireUser, isAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getSettings } from "@/lib/settings";
 import { CustomerHeader } from "@/components/customer-header";
+import { OverdueBanner } from "@/components/overdue-banner";
 import { CartView } from "./cart-view";
 
 export default async function CartPage() {
@@ -20,6 +21,7 @@ export default async function CartPage() {
         label={customer?.business_name ?? user.email ?? ""}
         isAdminUser={isAdmin(user.email)}
       />
+      <OverdueBanner />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
         <h1 className="text-2xl font-bold tracking-tight text-stone-900">
           Your cart

@@ -20,6 +20,7 @@ export async function GET(request: Request): Promise<Response> {
     alreadyPresent: summary.alreadyPresent,
     canceled: summary.canceled.length,
     skippedEmpty: summary.skippedEmpty.length,
+    skippedLocked: summary.skippedLocked.length,
     errors: summary.errors,
     createdDetails: summary.created,
   });

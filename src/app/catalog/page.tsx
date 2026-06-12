@@ -5,6 +5,7 @@ import { formatPrice } from "@/lib/format";
 import type { Customer, Product, CustomerPricing, PricedProduct } from "@/lib/types";
 import { AddToCart } from "./add-to-cart";
 import { CustomerHeader } from "@/components/customer-header";
+import { OverdueBanner } from "@/components/overdue-banner";
 
 export default async function CatalogPage() {
   const user = await requireUser();
@@ -56,6 +57,7 @@ export default async function CatalogPage() {
         label={customer?.business_name ?? user.email ?? ""}
         isAdminUser={isAdmin(user.email)}
       />
+      <OverdueBanner />
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
         <h1 className="text-2xl font-bold tracking-tight text-stone-900">
