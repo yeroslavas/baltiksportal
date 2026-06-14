@@ -82,10 +82,13 @@ export async function markOverdueInvoices(
   return data?.length ?? 0;
 }
 
-// A customer's past-due invoices — the LIVE "overdue debt" check (due date has
-// passed, still unpaid/overdue), independent of the nightly sweep so it's
-// accurate the moment a due date lapses. Used to lock delinquent customers out
-// of placing new orders (manual checkout + standing-order generation).
+// A customer's invoices that put them on "credit stop". An invoice qualifies if:
+//   • status = 'overdue' — explicitly flagged (admin dropdown or nightly sweep),
+//     which acts as an immediate manual hold regardless of the due date; or
+//   • status = 'unpaid' AND its due date has passed — a live past-due check, so a
+//     lapsed invoice locks the moment its due date passes, before any sweep runs.
+// Drives both the order-placement lock (checkout + standing-order generation) and
+// the customer "account on hold" banner.
 export async function getOverdueInvoices(
   customerId: string,
   admin?: SupabaseClient,
@@ -98,8 +101,7 @@ export async function getOverdueInvoices(
     .from("invoices")
     .select("id, invoice_number, total_amount, due_date")
     .eq("customer_id", customerId)
-    .in("status", ["unpaid", "overdue"])
-    .lt("due_date", today)
+    .or(`status.eq.overdue,and(status.eq.unpaid,due_date.lt.${today})`)
     .order("due_date");
   return data ?? [];
 }
