@@ -361,8 +361,12 @@ alter table public.app_settings
 -- generator reads it to set each invoice's due date. Internal — not granted to
 -- the customer API roles (customers still see the resulting due date per invoice).
 alter table public.customers
-  add column if not exists invoice_terms_days integer not null default 30
+  add column if not exists invoice_terms_days integer not null default 7
   check (invoice_terms_days between 0 and 365);
+-- Default net terms is 7 days. The add-column above is a no-op once the column
+-- exists, so set the default explicitly for already-migrated databases. Applies
+-- to NEW customers only — existing rows keep their current value.
+alter table public.customers alter column invoice_terms_days set default 7;
 
 -- ----------------------------------------------------------------------------
 -- Order cutoff (next-day ordering window)
@@ -464,7 +468,7 @@ create table if not exists public.invoices (
   customer_id    uuid not null references public.customers (id) on delete cascade,
   order_id       uuid not null unique references public.orders (id) on delete cascade,
   issue_date     date not null default current_date,
-  due_date       date not null default (current_date + 30),
+  due_date       date not null default (current_date + 7),
   status         text not null default 'unpaid'
                    check (status in ('unpaid', 'paid', 'overdue')),
   total_amount   numeric(10,2) not null default 0 check (total_amount >= 0),
@@ -486,6 +490,10 @@ alter table public.invoices add column if not exists payment_note text;
 -- Stripe PaymentIntent id, set when an invoice is paid online (paid_at already
 -- exists above). Reference back to the Stripe transaction.
 alter table public.invoices add column if not exists stripe_payment_id text;
+-- Keep the invoice-level due-date fallback in step with the 7-day net terms (the
+-- app sets due_date explicitly per customer, so this only applies to a direct
+-- insert with no due_date). No-op on fresh installs — table default is already 7.
+alter table public.invoices alter column due_date set default (current_date + 7);
 
 alter table public.invoices enable row level security;
 

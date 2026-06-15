@@ -35,7 +35,7 @@ export async function createInvoiceForOrder(opts: {
     .select("invoice_terms_days")
     .eq("id", opts.customerId)
     .maybeSingle<{ invoice_terms_days: number | null }>();
-  const termsDays = cust?.invoice_terms_days ?? 30;
+  const termsDays = cust?.invoice_terms_days ?? 7;
   const issueDate = businessToday();
   const dueDate = addDays(issueDate, termsDays);
 
