@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, isSuperAdmin } from "@/lib/auth";
 import { logout } from "@/app/login/actions";
 
 const NAV = [
@@ -22,6 +22,10 @@ export default async function AdminLayout({
 }) {
   // Redirects non-admins; this guards every /admin/* route.
   const user = await requireAdmin();
+  // Utilities is super-admin only — drop it from the nav for sub-admins.
+  const nav = isSuperAdmin(user.email)
+    ? NAV
+    : NAV.filter((item) => item.href !== "/admin/utilities");
 
   return (
     <div className="flex flex-1 flex-col">
@@ -40,7 +44,7 @@ export default async function AdminLayout({
               <span className="text-stone-200">Admin</span>
             </span>
             <nav className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-              {NAV.map((item) => (
+              {nav.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}

@@ -1,7 +1,10 @@
+import { requireSuperAdmin } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { UtilitiesForm } from "./utilities-form";
 
 export default async function UtilitiesPage() {
+  // Utilities is super-admin only — a sub-admin who navigates here is redirected.
+  await requireSuperAdmin();
   const settings = await getSettings();
 
   return (

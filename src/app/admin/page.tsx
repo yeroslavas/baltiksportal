@@ -1,7 +1,10 @@
 import Link from "next/link";
+import { requireAdmin, isSuperAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export default async function AdminDashboard() {
+  const user = await requireAdmin();
+  const superAdmin = isSuperAdmin(user.email);
   const admin = createAdminClient();
 
   const [
@@ -76,7 +79,9 @@ export default async function AdminDashboard() {
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {cards.map((card) => (
+        {cards
+          .filter((card) => superAdmin || card.href !== "/admin/utilities")
+          .map((card) => (
           <Link
             key={card.href}
             href={card.href}
