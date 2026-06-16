@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/auth";
+import { requireSuperAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type SettingsState = { error: string | null; success: string | null };
@@ -12,7 +12,7 @@ export async function updateSettings(
   _prev: SettingsState,
   formData: FormData,
 ): Promise<SettingsState> {
-  await requireAdmin();
+  await requireSuperAdmin();
 
   const fee = Number(formData.get("delivery_fee"));
   if (!Number.isFinite(fee) || fee < 0) {
