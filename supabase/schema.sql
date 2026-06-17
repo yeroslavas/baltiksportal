@@ -47,6 +47,9 @@ create table if not exists public.products (
   unit          text not null default 'dozen',
   base_price    numeric(10,2) not null check (base_price >= 0),
   is_active     boolean not null default true,
+  -- When true, this product can be ordered in 0.5 increments (half-dozen).
+  -- Off by default → whole units only (discrete packs).
+  allow_half_dozen boolean not null default false,
   image_url     text,
   sku           text,
   bake_time     text,
@@ -68,6 +71,7 @@ alter table public.products add column if not exists report_unit  text;
 alter table public.products add column if not exists report_count integer;
 alter table public.products add column if not exists sort_order   numeric;
 alter table public.products add column if not exists image_url    text;
+alter table public.products add column if not exists allow_half_dozen boolean not null default false;
 -- sort_order is numeric so new products can be inserted between two existing
 -- ones (e.g. 5.5 between 5 and 6) without renumbering the rest.
 alter table public.products alter column sort_order type numeric;
@@ -143,7 +147,7 @@ grant select (id, user_id, business_name, contact_name, email, phone, address, c
 
 -- products: hide sku, bake_time, product_type, report_* (internal/reporting).
 revoke select on public.products from anon, authenticated;
-grant select (id, name, description, unit, base_price, is_active, sort_order, image_url, created_at)
+grant select (id, name, description, unit, base_price, is_active, sort_order, image_url, allow_half_dozen, created_at)
   on public.products to anon, authenticated;
 
 -- ----------------------------------------------------------------------------
@@ -177,11 +181,15 @@ create table if not exists public.order_items (
   order_id     uuid not null references public.orders (id) on delete cascade,
   product_id   uuid references public.products (id) on delete set null,
   product_name text not null,
-  quantity     integer not null check (quantity > 0),
+  -- numeric (not integer) so half-dozen products can be ordered in 0.5 steps.
+  quantity     numeric not null check (quantity > 0),
   unit_price   numeric(10,2) not null check (unit_price >= 0),
   line_total   numeric(10,2) not null check (line_total >= 0),
   created_at   timestamptz not null default now()
 );
+
+-- Widen quantity to numeric on databases created when it was integer-only.
+alter table public.order_items alter column quantity type numeric;
 
 create index if not exists idx_orders_customer  on public.orders (customer_id);
 create index if not exists idx_orders_date       on public.orders (order_date desc);
@@ -322,7 +330,8 @@ create table if not exists public.standing_order_items (
   standing_order_id uuid not null
                       references public.standing_orders (id) on delete cascade,
   product_id        uuid not null references public.products (id) on delete cascade,
-  quantity          integer not null check (quantity > 0),
+  -- numeric so half-dozen products can carry 0.5-step standing quantities.
+  quantity          numeric not null check (quantity > 0),
   created_at        timestamptz not null default now()
 );
 
@@ -330,6 +339,8 @@ create index if not exists idx_standing_orders_customer
   on public.standing_orders (customer_id);
 create index if not exists idx_standing_order_items_so
   on public.standing_order_items (standing_order_id);
+-- Widen quantity to numeric on databases created when it was integer-only.
+alter table public.standing_order_items alter column quantity type numeric;
 
 -- Link a generated order back to its standing order. The PARTIAL UNIQUE index
 -- is the idempotency guarantee: at most one order per (standing order, delivery

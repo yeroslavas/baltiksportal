@@ -42,6 +42,7 @@ export function CartView({
             </div>
             <QuantityInput
               value={i.quantity}
+              step={i.allowHalf ? 0.5 : 1}
               onCommit={(q) => updateQuantity(i.productId, q)}
               ariaLabel={`Quantity of ${i.name}`}
               className="w-16 rounded-lg border border-stone-300 px-2 py-1.5 text-sm text-stone-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200"

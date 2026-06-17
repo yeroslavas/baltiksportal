@@ -42,7 +42,7 @@ export function StandingOrderForm({
 }: {
   mode: "create" | "edit";
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
-  products: { id: string; name: string; unit: string }[];
+  products: { id: string; name: string; unit: string; allowHalf: boolean }[];
   customers?: { id: string; business_name: string }[];
   initial?: StandingOrderInitial;
 }) {
@@ -256,6 +256,8 @@ export function StandingOrderForm({
               <input
                 type="number"
                 min={0}
+                step={p.allowHalf ? 0.5 : 1}
+                inputMode={p.allowHalf ? "decimal" : "numeric"}
                 name={`qty:${p.id}`}
                 defaultValue={initial?.items[p.id] ?? ""}
                 placeholder="0"

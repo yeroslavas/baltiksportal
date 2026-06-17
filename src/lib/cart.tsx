@@ -14,7 +14,16 @@ export type CartItem = {
   name: string;
   unit: string;
   unitPrice: number; // the customer's price at add-time (display only)
+  // When true, orderable in 0.5 increments (half-dozen); otherwise whole units.
+  allowHalf: boolean;
   quantity: number;
+};
+
+// Round a quantity to the item's allowed increment (0.5 for half-dozen items,
+// whole units otherwise). Tolerates a missing flag (legacy carts) as whole-only.
+const snapQty = (qty: number, allowHalf?: boolean) => {
+  const step = allowHalf ? 0.5 : 1;
+  return Math.round(qty / step) * step;
 };
 
 type CartContextValue = {
@@ -62,7 +71,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const addItem = useCallback(
     (item: Omit<CartItem, "quantity">, qty: number) => {
-      const quantity = Math.max(1, Math.floor(qty) || 1);
+      const step = item.allowHalf ? 0.5 : 1;
+      const quantity = Math.max(step, snapQty(qty, item.allowHalf) || step);
       setItems((prev) => {
         const existing = prev.find((i) => i.productId === item.productId);
         if (existing) {
@@ -80,7 +90,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const updateQuantity = useCallback((productId: string, qty: number) => {
     setItems((prev) => {
-      const quantity = Math.floor(qty);
+      const item = prev.find((i) => i.productId === productId);
+      const quantity = snapQty(qty, item?.allowHalf);
       if (quantity <= 0) return prev.filter((i) => i.productId !== productId);
       return prev.map((i) =>
         i.productId === productId ? { ...i, quantity } : i,

@@ -58,10 +58,12 @@ export async function priceOrder(opts: {
     }>();
   if (!customer) return { error: "Customer not found." };
 
-  // Normalise quantities; collect product ids.
+  // Collect raw quantities; collect product ids. Snapping to each product's
+  // allowed increment (0.5 for half-dozen items, whole otherwise) happens below,
+  // once we know the per-product flag.
   const qtyByProduct = new Map<string, number>();
   for (const line of opts.lines) {
-    const qty = Math.floor(Number(line.quantity));
+    const qty = Number(line.quantity);
     if (!line.productId || !Number.isFinite(qty) || qty <= 0) {
       return { error: "This order has an invalid item." };
     }
@@ -77,7 +79,7 @@ export async function priceOrder(opts: {
   const [{ data: products }, { data: pricing }] = await Promise.all([
     admin
       .from("products")
-      .select("id, name, base_price, is_active")
+      .select("id, name, base_price, is_active, allow_half_dozen")
       .in("id", productIds),
     admin
       .from("customer_pricing")
@@ -90,7 +92,7 @@ export async function priceOrder(opts: {
   const productById = new Map((products ?? []).map((p) => [p.id, p]));
 
   const items: PricedItem[] = [];
-  for (const [productId, qty] of qtyByProduct) {
+  for (const [productId, rawQty] of qtyByProduct) {
     const product = productById.get(productId);
     if (!product || !product.is_active) {
       if (skipUnavailable) continue;
@@ -98,6 +100,16 @@ export async function priceOrder(opts: {
         error:
           "An item in this order is no longer available. Please review it.",
       };
+    }
+    // Snap to the product's allowed increment: half-dozen items round to the
+    // nearest 0.5, everything else to a whole unit. This is the authoritative
+    // backstop for the client-side step, so a tampered/stale quantity can't
+    // create a fractional order on a discrete-pack product.
+    const step = product.allow_half_dozen ? 0.5 : 1;
+    const qty = Math.round(rawQty / step) * step;
+    if (qty <= 0) {
+      if (skipUnavailable) continue;
+      return { error: "This order has an invalid item." };
     }
     const unitPrice = round2(
       overrides.get(productId) ?? Number(product.base_price),

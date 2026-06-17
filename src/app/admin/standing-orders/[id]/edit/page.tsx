@@ -30,7 +30,7 @@ export default async function EditStandingOrderPage({
         .eq("standing_order_id", id),
       admin
         .from("products")
-        .select("id, name, unit, sort_order")
+        .select("id, name, unit, sort_order, allow_half_dozen")
         .eq("is_active", true)
         .order("sort_order", { ascending: true, nullsFirst: false })
         .order("name"),
@@ -56,14 +56,20 @@ export default async function EditStandingOrderPage({
 
   // Include any item product that's no longer active, so its quantity shows and
   // isn't silently dropped on save.
-  type Prod = { id: string; name: string; unit: string; sort_order: number | null };
+  type Prod = {
+    id: string;
+    name: string;
+    unit: string;
+    sort_order: number | null;
+    allow_half_dozen: boolean;
+  };
   const products = [...(activeProducts ?? [])] as Prod[];
   const present = new Set(products.map((p) => p.id));
   const missingIds = items.map((i) => i.product_id).filter((pid) => !present.has(pid));
   if (missingIds.length > 0) {
     const { data: extra } = await admin
       .from("products")
-      .select("id, name, unit, sort_order")
+      .select("id, name, unit, sort_order, allow_half_dozen")
       .in("id", missingIds);
     for (const p of (extra ?? []) as Prod[]) products.push(p);
     // Keep catalog order (sort_order, then name) after merging the extras.
@@ -114,7 +120,12 @@ export default async function EditStandingOrderPage({
         <StandingOrderForm
           mode="edit"
           action={updateStandingOrder}
-          products={products}
+          products={products.map((p) => ({
+            id: p.id,
+            name: p.name,
+            unit: p.unit,
+            allowHalf: p.allow_half_dozen,
+          }))}
           initial={initial}
         />
       </section>

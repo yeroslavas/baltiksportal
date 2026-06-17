@@ -8,26 +8,35 @@ export function AddToCart({
   name,
   unit,
   unitPrice,
+  allowHalf,
 }: {
   productId: string;
   name: string;
   unit: string;
   unitPrice: number;
+  allowHalf: boolean;
 }) {
   const { addItem } = useCart();
+  const step = allowHalf ? 0.5 : 1;
   // Stored as a string so the field can be fully cleared while typing (needed
-  // to replace "1" with another number on mobile); clamped to >= 1 on use.
+  // to replace "1" with another number on mobile); snapped to the allowed
+  // increment (>= step) on use.
   const [qty, setQty] = useState("1");
   const [added, setAdded] = useState(false);
 
-  const normalizedQty = () => Math.max(1, parseInt(qty, 10) || 1);
+  const normalizedQty = () => {
+    const n = parseFloat(qty);
+    if (!Number.isFinite(n) || n < step) return step;
+    return Math.round(n / step) * step;
+  };
 
   return (
     <div className="mt-4 flex items-center gap-2">
       <input
         type="number"
-        min={1}
-        inputMode="numeric"
+        min={step}
+        step={step}
+        inputMode={allowHalf ? "decimal" : "numeric"}
         value={qty}
         onChange={(e) => setQty(e.target.value)}
         onBlur={() => setQty(String(normalizedQty()))}
@@ -39,7 +48,7 @@ export function AddToCart({
         onClick={() => {
           const n = normalizedQty();
           setQty(String(n));
-          addItem({ productId, name, unit, unitPrice }, n);
+          addItem({ productId, name, unit, unitPrice, allowHalf }, n);
           setAdded(true);
           setTimeout(() => setAdded(false), 1500);
         }}

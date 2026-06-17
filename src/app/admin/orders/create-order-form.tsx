@@ -11,6 +11,14 @@ type Priced = {
   unit: string;
   price: number;
   hasOverride: boolean;
+  allowHalf: boolean;
+};
+
+// Snap a typed quantity to the product's allowed increment (0.5 / whole).
+const snapQty = (p: Priced, raw: string | undefined) => {
+  const step = p.allowHalf ? 0.5 : 1;
+  const n = Math.max(0, Number(raw) || 0);
+  return Math.round(n / step) * step;
 };
 
 const inputClass =
@@ -43,7 +51,7 @@ export function CreateOrderForm({
   const [error, setError] = useState<string | null>(null);
 
   const lines = products
-    .map((p) => ({ p, q: Math.max(0, Math.floor(Number(qty[p.id]) || 0)) }))
+    .map((p) => ({ p, q: snapQty(p, qty[p.id]) }))
     .filter((x) => x.q > 0);
   const subtotal = lines.reduce((s, x) => s + x.p.price * x.q, 0);
   const fee =
@@ -131,7 +139,7 @@ export function CreateOrderForm({
           </thead>
           <tbody className="divide-y divide-stone-100">
             {products.map((p) => {
-              const q = Math.max(0, Math.floor(Number(qty[p.id]) || 0));
+              const q = snapQty(p, qty[p.id]);
               return (
                 <tr key={p.id}>
                   <td className="px-4 py-2 text-stone-800">
@@ -150,7 +158,8 @@ export function CreateOrderForm({
                     <input
                       type="number"
                       min={0}
-                      inputMode="numeric"
+                      step={p.allowHalf ? 0.5 : 1}
+                      inputMode={p.allowHalf ? "decimal" : "numeric"}
                       value={qty[p.id] ?? ""}
                       placeholder="0"
                       onChange={(e) =>

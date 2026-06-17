@@ -28,6 +28,8 @@ export type Product = {
   unit: string;
   base_price: number;
   is_active: boolean;
+  // When true, orderable in 0.5 increments (half-dozen); otherwise whole units.
+  allow_half_dozen: boolean;
   image_url: string | null;
   // Internal / reporting fields (not customer-facing; managed via CSV import).
   sku: string | null;

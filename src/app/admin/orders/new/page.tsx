@@ -47,6 +47,7 @@ export default async function AdminNewOrderPage({
     unit: string;
     price: number;
     hasOverride: boolean;
+    allowHalf: boolean;
   }[] = [];
   if (selected) {
     const { data: pricingData } = await admin
@@ -64,6 +65,7 @@ export default async function AdminNewOrderPage({
         ? (overrides.get(p.id) as number)
         : Number(p.base_price),
       hasOverride: overrides.has(p.id),
+      allowHalf: p.allow_half_dozen,
     }));
   }
 

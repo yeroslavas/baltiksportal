@@ -24,7 +24,7 @@ export default async function CatalogPage() {
   // only (no sku/report_* — those are restricted from the API roles too).
   const { data: productsData } = await supabase
     .from("products")
-    .select("id, name, description, unit, base_price, sort_order, image_url")
+    .select("id, name, description, unit, base_price, sort_order, image_url, allow_half_dozen")
     .order("sort_order", { ascending: true, nullsFirst: false })
     .order("name");
   const products = (productsData ?? []) as Product[];
@@ -117,6 +117,7 @@ export default async function CatalogPage() {
                     name={item.name}
                     unit={item.unit}
                     unitPrice={item.effective_price}
+                    allowHalf={item.allow_half_dozen}
                   />
                 </div>
               </li>

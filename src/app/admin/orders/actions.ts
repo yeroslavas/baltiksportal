@@ -34,10 +34,12 @@ export async function createOrderAsAdmin(
     return { error: "Choose a valid date." };
   }
 
+  // Pass raw quantities through — createOrderForCustomer/priceOrder snaps each
+  // to its product's allowed increment (0.5 for half-dozen items, whole else).
   const cleanLines = (Array.isArray(lines) ? lines : [])
     .map((l) => ({
       productId: String(l?.productId ?? ""),
-      quantity: Math.floor(Number(l?.quantity)),
+      quantity: Number(l?.quantity),
     }))
     .filter((l) => l.productId && Number.isFinite(l.quantity) && l.quantity > 0);
   if (cleanLines.length === 0) {
