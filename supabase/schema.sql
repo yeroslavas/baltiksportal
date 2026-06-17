@@ -401,6 +401,11 @@ alter table public.app_settings
 alter table public.app_settings
   add column if not exists available_days int[] not null default '{1,2,3,4,5,6,7}';
 
+-- Last Google Sheets production-export run: { at, ok, rows, error, durationMs }.
+-- Powers the admin freshness indicator + in-sheet stamp. See src/lib/orders-export.ts.
+alter table public.app_settings
+  add column if not exists sheets_sync_state jsonb;
+
 -- ----------------------------------------------------------------------------
 -- Order cancellation (soft)
 --
