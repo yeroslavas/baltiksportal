@@ -29,6 +29,26 @@ export function sheetsConfigured(): boolean {
   return readConfig() !== null;
 }
 
+// Non-secret summary of the LIVE config (what the deployed server actually
+// reads) for the admin diagnostic panel. The URL isn't a credential on its own
+// (the secret is separate); the secret is shown only as a length + last-4 hint
+// so it can be matched against the Apps Script without exposing it.
+export function sheetsConfigSummary(): {
+  url: string | null;
+  secretSet: boolean;
+  secretHint: string | null;
+  tab: string;
+} {
+  const url = process.env.GOOGLE_SHEETS_WEBHOOK_URL?.trim() || null;
+  const secret = process.env.GOOGLE_SHEETS_WEBHOOK_SECRET?.trim() || "";
+  return {
+    url,
+    secretSet: secret.length > 0,
+    secretHint: secret ? `ends “${secret.slice(-4)}”, ${secret.length} chars` : null,
+    tab: sheetsTabName(),
+  };
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Send the full export to the sheet's Apps Script web app. Returns the row count

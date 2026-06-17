@@ -1,4 +1,4 @@
-import { sheetsConfigured } from "@/lib/google-sheets";
+import { sheetsConfigured, sheetsConfigSummary } from "@/lib/google-sheets";
 import { getSyncStatus } from "@/lib/orders-export";
 import { SyncSheetButton } from "./sync-sheet-button";
 
@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminReportingPage() {
   const configured = sheetsConfigured();
+  const cfg = sheetsConfigSummary();
   const { state, stale, ageLabel } = configured
     ? await getSyncStatus()
     : { state: null, stale: false, ageLabel: null };
@@ -86,6 +87,36 @@ export default async function AdminReportingPage() {
             pivots and notes on separate tabs.
           </p>
         )}
+
+        {/* Connection diagnostic — shows what the LIVE deployment actually reads,
+            so a not-yet-redeployed env change or URL mismatch is obvious. */}
+        <details className="text-xs text-stone-500">
+          <summary className="cursor-pointer select-none font-medium">
+            Connection details
+          </summary>
+          <dl className="mt-2 space-y-1">
+            <div>
+              <span className="text-stone-400">Webhook URL (live): </span>
+              <span className="break-all font-mono text-stone-700">
+                {cfg.url ?? "— not set —"}
+              </span>
+            </div>
+            <div>
+              <span className="text-stone-400">Secret: </span>
+              <span className="font-mono text-stone-700">
+                {cfg.secretSet ? cfg.secretHint : "— not set —"}
+              </span>
+            </div>
+            <div>
+              <span className="text-stone-400">Data tab: </span>
+              <span className="font-mono text-stone-700">{cfg.tab}</span>
+            </div>
+          </dl>
+          <p className="mt-2 text-stone-400">
+            This reflects the current deployment’s env vars. If it doesn’t match
+            what you set in Vercel, redeploy there to apply the change.
+          </p>
+        </details>
       </section>
 
       {/* Sales insights — second reporting substream, not built yet. */}
