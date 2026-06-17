@@ -9,11 +9,17 @@ export default async function NewStandingOrderPage() {
     admin.from("customers").select("id, business_name").order("business_name"),
     admin
       .from("products")
-      .select("id, name, unit")
+      .select("id, name, unit, allow_half_dozen")
       .eq("is_active", true)
       .order("sort_order", { ascending: true, nullsFirst: false })
       .order("name"),
   ]);
+  const productOptions = (products ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    unit: p.unit,
+    allowHalf: p.allow_half_dozen,
+  }));
 
   return (
     <div className="space-y-8">
@@ -34,7 +40,7 @@ export default async function NewStandingOrderPage() {
           mode="create"
           action={createStandingOrder}
           customers={customers ?? []}
-          products={products ?? []}
+          products={productOptions}
         />
       </section>
     </div>

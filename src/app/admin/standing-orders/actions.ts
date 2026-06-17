@@ -23,8 +23,12 @@ type Parsed = {
   items: { productId: string; quantity: number }[];
 };
 
-// Shared parse + validate for both create and update.
-function parseForm(formData: FormData): Parsed | { error: string } {
+// Shared parse + validate for both create and update. Async because it snaps
+// each item's quantity to that product's allowed increment (0.5 / whole).
+async function parseForm(
+  admin: ReturnType<typeof createAdminClient>,
+  formData: FormData,
+): Promise<Parsed | { error: string }> {
   const fulfillmentType =
     formData.get("fulfillment_type") === "pickup" ? "pickup" : "delivery";
   const intervalWeeks = formData.get("interval_weeks") === "2" ? 2 : 1;
@@ -67,14 +71,36 @@ function parseForm(formData: FormData): Parsed | { error: string } {
     ),
   ].sort();
 
-  const items: { productId: string; quantity: number }[] = [];
+  const rawItems: { productId: string; quantity: number }[] = [];
   for (const [key, value] of formData.entries()) {
     if (!key.startsWith("qty:")) continue;
-    const quantity = Math.floor(Number(value));
+    const quantity = Number(value);
     if (Number.isFinite(quantity) && quantity > 0) {
-      items.push({ productId: key.slice(4), quantity });
+      rawItems.push({ productId: key.slice(4), quantity });
     }
   }
+  if (rawItems.length === 0) {
+    return { error: "Add at least one product with a quantity." };
+  }
+
+  // Snap each quantity to its product's increment (0.5 for half-dozen items,
+  // whole otherwise) so stored quantities match what the generator will order.
+  const { data: prods } = await admin
+    .from("products")
+    .select("id, allow_half_dozen")
+    .in(
+      "id",
+      rawItems.map((i) => i.productId),
+    );
+  const halfById = new Map(
+    (prods ?? []).map((p) => [p.id, p.allow_half_dozen]),
+  );
+  const items = rawItems
+    .map((i) => {
+      const step = halfById.get(i.productId) ? 0.5 : 1;
+      return { productId: i.productId, quantity: Math.round(i.quantity / step) * step };
+    })
+    .filter((i) => i.quantity > 0);
   if (items.length === 0) {
     return { error: "Add at least one product with a quantity." };
   }
@@ -114,10 +140,10 @@ export async function createStandingOrder(
   const customerId = String(formData.get("customer_id") ?? "").trim();
   if (!customerId) return { error: "Choose a customer.", success: null };
 
-  const parsed = parseForm(formData);
+  const admin = createAdminClient();
+  const parsed = await parseForm(admin, formData);
   if ("error" in parsed) return { error: parsed.error, success: null };
 
-  const admin = createAdminClient();
   const { data: so, error } = await admin
     .from("standing_orders")
     .insert({ customer_id: customerId, ...rowFromParsed(parsed) })
@@ -155,10 +181,10 @@ export async function updateStandingOrder(
   const id = String(formData.get("id") ?? "").trim();
   if (!id) return { error: "Missing standing-order reference.", success: null };
 
-  const parsed = parseForm(formData);
+  const admin = createAdminClient();
+  const parsed = await parseForm(admin, formData);
   if ("error" in parsed) return { error: parsed.error, success: null };
 
-  const admin = createAdminClient();
   const { error } = await admin
     .from("standing_orders")
     .update(rowFromParsed(parsed))
