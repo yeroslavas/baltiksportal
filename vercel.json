@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/order-status",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/sheets-sync",
+      "schedule": "30 * * * *"
     }
   ]
 }
