@@ -167,7 +167,8 @@ export async function placeOrder(
   try {
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",
-      payment_method_types: ["us_bank_account", "card"],
+      // ACH only — cards disabled to avoid card processing fees.
+      payment_method_types: ["us_bank_account"],
       customer_creation: "always",
       customer_email: customer.email ?? undefined,
       line_items: [

@@ -226,7 +226,7 @@ export function CheckoutView({
       <p className="text-xs text-stone-500">
         Final prices are confirmed at submission using your account pricing.
         {requiresPayment
-          ? " Payment is required to place this order — you'll be taken to a secure payment page (bank transfer or card)."
+          ? " Payment is required to place this order — you'll be taken to a secure bank-transfer payment page."
           : ""}
       </p>
 

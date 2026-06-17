@@ -53,7 +53,8 @@ export async function payInvoice(formData: FormData) {
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",
       // ACH first (preferred), then card.
-      payment_method_types: ["us_bank_account", "card"],
+      // ACH only — cards disabled to avoid card processing fees.
+      payment_method_types: ["us_bank_account"],
       // ACH debits need a Customer to hold the mandate.
       customer_creation: "always",
       customer_email: customer.email ?? undefined,
@@ -140,7 +141,8 @@ export async function payInvoices(formData: FormData) {
   try {
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",
-      payment_method_types: ["us_bank_account", "card"],
+      // ACH only — cards disabled to avoid card processing fees.
+      payment_method_types: ["us_bank_account"],
       customer_creation: "always",
       customer_email: customer.email ?? undefined,
       line_items: payable.map((i) => ({
