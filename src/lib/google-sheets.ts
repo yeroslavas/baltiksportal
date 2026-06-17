@@ -75,20 +75,26 @@ export async function pushToSheet(payload: {
       throw new Error(`Sheet web app ${res.status}: ${text.slice(0, 300)}`);
     }
 
-    let parsed: { ok?: boolean; rows?: number; error?: string } = {};
+    type ScriptResult = { ok?: boolean; rows?: number; error?: string };
+    let parsed: ScriptResult | null = null;
     try {
-      parsed = JSON.parse(text);
+      const json = JSON.parse(text);
+      if (json && typeof json === "object") parsed = json as ScriptResult;
     } catch {
-      // Non-JSON 200 — treat as success (older script versions), fall through.
+      parsed = null;
     }
-    if (parsed.ok === false) {
-      throw new Error(parsed.error || "The Sheet script rejected the request.");
+    if (!parsed) {
+      // 200 but not our JSON — almost always Google's HTML sign-in/error page
+      // because the web app isn't deployed with "Anyone" access (or the URL is
+      // wrong). Never report a false success — that's the whole point of the
+      // freshness indicator.
+      throw new Error(
+        `Sheet web app didn't return JSON — it's likely not deployed with "Anyone" access. Response began: ${text.slice(0, 160)}`,
+      );
     }
-    return {
-      rows:
-        typeof parsed.rows === "number"
-          ? parsed.rows
-          : Math.max(0, payload.values.length - 1),
-    };
+    if (parsed.ok !== true) {
+      throw new Error(parsed.error || "The Sheet script did not confirm success.");
+    }
+    return { rows: typeof parsed.rows === "number" ? parsed.rows : 0 };
   }
 }
