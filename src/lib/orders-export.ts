@@ -29,6 +29,7 @@ const HEADERS: string[] = [
   "Report group",
   "Report unit",
   "Bake time",
+  "Product type",
   "Quantity",
   "Units per",
   "Bake units",
@@ -65,13 +66,14 @@ type ItemRow = {
     report_unit: string | null;
     report_count: number | null;
     bake_time: string | null;
+    product_type: string | null;
   } | null;
 };
 
 const SELECT =
   "product_name, quantity, unit_price, line_total, order_id, " +
   "orders!inner(order_number, status, order_date, fulfillment_type, delivery_date, delivery_time, total_amount, standing_order_id, customers(business_name, contact_name)), " +
-  "products(sku, report_group, report_unit, report_count, bake_time)";
+  "products(sku, report_group, report_unit, report_count, bake_time, product_type)";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -116,6 +118,7 @@ async function buildOrderRows(): Promise<{ header: string[]; rows: Cell[][] }> {
       p?.report_group ?? "",
       p?.report_unit ?? "",
       p?.bake_time ?? "",
+      p?.product_type ?? "",
       qty,
       reportCount ?? "",
       bakeUnits,
