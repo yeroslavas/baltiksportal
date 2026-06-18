@@ -16,11 +16,112 @@ const RB_COLORS = [
   { fill: "#f6c2b1", text: "#1f354c" }, // peach
   { fill: "#1f354c", text: "#ffffff" }, // brand-800 (deep navy)
 ];
+// Channel donut: Foodservice vs Retail.
+const CH_COLORS = [
+  { fill: "#305277", text: "#ffffff" }, // Foodservice — brand navy
+  { fill: "#f6c2b1", text: "#1f354c" }, // Retail — peach
+];
 const DONUT_SIZE = 168;
 const DONUT_STROKE = 34;
 const DONUT_R = (DONUT_SIZE - DONUT_STROKE) / 2;
 const DONUT_C = 2 * Math.PI * DONUT_R;
 const DONUT_MID = DONUT_SIZE / 2;
+
+// A labeled donut + legend for a revenue breakdown. Slices ≥5% are labeled on
+// the ring; the legend lists every slice with its $ and %.
+function DonutChart({
+  title,
+  data,
+  colors,
+}: {
+  title: string;
+  data: { label: string; value: number }[];
+  colors: { fill: string; text: string }[];
+}) {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  return (
+    <div>
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-stone-400">
+        {title}
+      </h4>
+      {total <= 0 ? (
+        <p className="mt-3 text-sm text-stone-400">No revenue in this range.</p>
+      ) : (
+        <div className="mt-3 flex flex-wrap items-center gap-6">
+          <svg
+            viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`}
+            width={DONUT_SIZE}
+            height={DONUT_SIZE}
+            className="shrink-0"
+            role="img"
+            aria-label={title}
+          >
+            {data.map((b, i) => {
+              const prior = data.slice(0, i).reduce((s, x) => s + x.value, 0);
+              const frac = b.value / total;
+              if (frac <= 0) return null;
+              return (
+                <circle
+                  key={b.label}
+                  cx={DONUT_MID}
+                  cy={DONUT_MID}
+                  r={DONUT_R}
+                  fill="none"
+                  stroke={colors[i].fill}
+                  strokeWidth={DONUT_STROKE}
+                  strokeDasharray={`${frac * DONUT_C} ${DONUT_C}`}
+                  strokeDashoffset={-((prior / total) * DONUT_C)}
+                  transform={`rotate(-90 ${DONUT_MID} ${DONUT_MID})`}
+                />
+              );
+            })}
+            {data.map((b, i) => {
+              const prior = data.slice(0, i).reduce((s, x) => s + x.value, 0);
+              const pct = (b.value / total) * 100;
+              if (pct < 5) return null; // tiny slices stay in the legend only
+              const mid = (prior + b.value / 2) / total;
+              const ang = mid * 2 * Math.PI - Math.PI / 2;
+              return (
+                <text
+                  key={b.label}
+                  x={DONUT_MID + DONUT_R * Math.cos(ang)}
+                  y={DONUT_MID + DONUT_R * Math.sin(ang)}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize="13"
+                  fontWeight="600"
+                  fill={colors[i].text}
+                >
+                  {Math.round(pct)}%
+                </text>
+              );
+            })}
+          </svg>
+          <ul className="min-w-[200px] flex-1 space-y-2">
+            {data.map((b, i) => {
+              const pct = total > 0 ? (b.value / total) * 100 : 0;
+              return (
+                <li key={b.label} className="flex items-center gap-3 text-sm">
+                  <span
+                    className="h-3 w-3 shrink-0 rounded-sm"
+                    style={{ background: colors[i].fill }}
+                  />
+                  <span className="flex-1 text-stone-700">{b.label}</span>
+                  <span className="font-medium text-stone-900">
+                    {formatPrice(b.value)}
+                  </span>
+                  <span className="w-10 text-right text-stone-400">
+                    {pct.toFixed(0)}%
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
 const slicerInput =
   "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200";
 
@@ -33,8 +134,6 @@ export default async function AdminReportingPage({
   const insights = await getInsights({ from, to });
   const maxWeekday = Math.max(1, ...insights.weekday.map((w) => w.avg));
   const maxCustomer = Math.max(1, ...insights.topCustomers.map((c) => c.total));
-
-  const rbTotal = insights.revenueBreakdown.reduce((s, b) => s + b.value, 0);
 
   const configured = sheetsConfigured();
   const cfg = sheetsConfigSummary();
@@ -294,85 +393,18 @@ export default async function AdminReportingPage({
           <h3 className="text-sm font-semibold text-stone-700">
             Revenue breakdown
           </h3>
-          {rbTotal <= 0 ? (
-            <p className="mt-2 text-sm text-stone-400">No revenue in this range.</p>
-          ) : (
-            <div className="mt-3 flex flex-wrap items-center gap-8">
-              <svg
-                viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`}
-                width={DONUT_SIZE}
-                height={DONUT_SIZE}
-                className="shrink-0"
-                role="img"
-                aria-label="Revenue breakdown"
-              >
-                {insights.revenueBreakdown.map((b, i) => {
-                  const prior = insights.revenueBreakdown
-                    .slice(0, i)
-                    .reduce((s, x) => s + x.value, 0);
-                  const frac = b.value / rbTotal;
-                  if (frac <= 0) return null;
-                  return (
-                    <circle
-                      key={b.label}
-                      cx={DONUT_MID}
-                      cy={DONUT_MID}
-                      r={DONUT_R}
-                      fill="none"
-                      stroke={RB_COLORS[i].fill}
-                      strokeWidth={DONUT_STROKE}
-                      strokeDasharray={`${frac * DONUT_C} ${DONUT_C}`}
-                      strokeDashoffset={-((prior / rbTotal) * DONUT_C)}
-                      transform={`rotate(-90 ${DONUT_MID} ${DONUT_MID})`}
-                    />
-                  );
-                })}
-                {insights.revenueBreakdown.map((b, i) => {
-                  const prior = insights.revenueBreakdown
-                    .slice(0, i)
-                    .reduce((s, x) => s + x.value, 0);
-                  const pct = (b.value / rbTotal) * 100;
-                  if (pct < 5) return null; // skip tiny slices (legend still shows them)
-                  const mid = (prior + b.value / 2) / rbTotal;
-                  const ang = mid * 2 * Math.PI - Math.PI / 2;
-                  return (
-                    <text
-                      key={b.label}
-                      x={DONUT_MID + DONUT_R * Math.cos(ang)}
-                      y={DONUT_MID + DONUT_R * Math.sin(ang)}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      fontSize="13"
-                      fontWeight="600"
-                      fill={RB_COLORS[i].text}
-                    >
-                      {Math.round(pct)}%
-                    </text>
-                  );
-                })}
-              </svg>
-              <ul className="min-w-[260px] flex-1 space-y-2">
-                {insights.revenueBreakdown.map((b, i) => {
-                  const pct = rbTotal > 0 ? (b.value / rbTotal) * 100 : 0;
-                  return (
-                    <li key={b.label} className="flex items-center gap-3 text-sm">
-                      <span
-                        className="h-3 w-3 shrink-0 rounded-sm"
-                        style={{ background: RB_COLORS[i].fill }}
-                      />
-                      <span className="flex-1 text-stone-700">{b.label}</span>
-                      <span className="font-medium text-stone-900">
-                        {formatPrice(b.value)}
-                      </span>
-                      <span className="w-10 text-right text-stone-400">
-                        {pct.toFixed(0)}%
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
+          <div className="mt-2 grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-2">
+            <DonutChart
+              title="By product"
+              data={insights.revenueBreakdown}
+              colors={RB_COLORS}
+            />
+            <DonutChart
+              title="Foodservice vs Retail"
+              data={insights.channelBreakdown}
+              colors={CH_COLORS}
+            />
+          </div>
         </div>
       </section>
     </div>
