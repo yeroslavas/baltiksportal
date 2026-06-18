@@ -33,6 +33,7 @@ const HEADERS: string[] = [
   "Quantity",
   "Units per",
   "Bake units",
+  "Bake trays",
   "Unit price",
   "Line total",
   "Order total", // order-level; written once per order (first row) so it sums cleanly
@@ -77,6 +78,9 @@ const SELECT =
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+// Bagels per bake tray — bake_trays = bake_units / TRAY_SIZE.
+const TRAY_SIZE = 15;
+
 async function buildOrderRows(): Promise<{ header: string[]; rows: Cell[][] }> {
   const admin = createAdminClient();
 
@@ -104,6 +108,9 @@ async function buildOrderRows(): Promise<{ header: string[]; rows: Cell[][] }> {
     const qty = Number(it.quantity);
     const reportCount = p?.report_count != null ? Number(p.report_count) : null;
     const bakeUnits = reportCount != null ? round2(qty * reportCount) : "";
+    // Fractional trays (kept un-rounded-up so pivot sums stay accurate; round up
+    // at the aggregate, not per row).
+    const bakeTrays = reportCount != null ? round2((qty * reportCount) / TRAY_SIZE) : "";
     rows.push([
       o.order_number,
       o.status,
@@ -122,6 +129,7 @@ async function buildOrderRows(): Promise<{ header: string[]; rows: Cell[][] }> {
       qty,
       reportCount ?? "",
       bakeUnits,
+      bakeTrays,
       round2(Number(it.unit_price)),
       round2(Number(it.line_total)),
       round2(Number(o.total_amount)), // blanked below for all but each order's first row
