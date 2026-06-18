@@ -81,6 +81,20 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 // Bagels per bake tray — bake_trays = bake_units / TRAY_SIZE.
 const TRAY_SIZE = 15;
 
+// Human-readable Eastern time for the sheet's "Last synced" stamp (auto EST/EDT).
+// The SyncState keeps the raw UTC ISO for the admin "synced X ago" math.
+function formatEastern(iso: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(new Date(iso));
+}
+
 async function buildOrderRows(): Promise<{ header: string[]; rows: Cell[][] }> {
   const admin = createAdminClient();
 
@@ -240,7 +254,7 @@ export async function exportOrdersToSheet(): Promise<SyncState> {
     const result = await pushToSheet({
       tab: sheetsTabName(),
       values: [header, ...rows],
-      syncedAt: at,
+      syncedAt: formatEastern(at), // the sheet shows Eastern; SyncState keeps UTC
     });
 
     const state: SyncState = {
