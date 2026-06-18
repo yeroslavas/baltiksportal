@@ -140,6 +140,18 @@ async function listAllUsers() {
 
 // ---- importers -----------------------------------------------------------
 
+// Derive report_group from the SKU naming convention. Keep in sync with
+// src/lib/report-group.ts.
+function deriveReportGroup(sku) {
+  const s = (sku ?? "").trim();
+  if (!s) return null;
+  if (/^bulk_/i.test(s)) return "doz bagels";
+  if (/^4-pk_/i.test(s)) return "pack_bagels";
+  if (/qt_/i.test(s)) return "Qt_CC";
+  if (/8oz_/i.test(s)) return "8oz_CC";
+  return null;
+}
+
 async function importProducts() {
   const rows = readTable(PATHS.products);
   if (rows === null) {
@@ -201,7 +213,8 @@ async function importProducts() {
       base_price: base,
       bake_time: r.bake_time || null,
       product_type: r.product_type || null,
-      report_group: r.report_group || null,
+      // SKU convention drives the group; the CSV value is only a fallback.
+      report_group: deriveReportGroup(sku) ?? (r.report_group || null),
       report_unit: r.report_unit || null,
       report_count: count,
       sort_order: line - 1,

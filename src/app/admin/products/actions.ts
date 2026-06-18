@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { deriveReportGroup } from "@/lib/report-group";
 
 export type ActionState = { error: string | null; success: string | null };
 
@@ -128,7 +129,8 @@ export async function createProduct(
     allow_half_dozen: formData.get("allow_half_dozen") === "on",
     bake_time: get("bake_time") || null,
     product_type: get("product_type") || null,
-    report_group: get("report_group") || null,
+    // SKU convention drives the group; manual entry is only a fallback.
+    report_group: deriveReportGroup(sku) ?? (get("report_group") || null),
     report_unit: get("report_unit") || null,
     report_count: reportCount,
     sort_order: sortOrder,
@@ -179,6 +181,15 @@ export async function updateProduct(
 
   const admin = createAdminClient();
 
+  // SKU is the stable key (never updated here) but it drives report_group and
+  // the image filename — fetch it once.
+  const { data: existingProd } = await admin
+    .from("products")
+    .select("sku")
+    .eq("id", id)
+    .maybeSingle<{ sku: string | null }>();
+  const sku = existingProd?.sku ?? null;
+
   // SKU is intentionally NOT updated here — it's the stable key linking the
   // product to pricing and CSV imports, so the edit form shows it read-only.
   const update: Record<string, unknown> = {
@@ -189,7 +200,8 @@ export async function updateProduct(
     allow_half_dozen: formData.get("allow_half_dozen") === "on",
     bake_time: get("bake_time") || null,
     product_type: get("product_type") || null,
-    report_group: get("report_group") || null,
+    // SKU convention drives the group; manual entry is only a fallback.
+    report_group: deriveReportGroup(sku) ?? (get("report_group") || null),
     report_unit: get("report_unit") || null,
     report_count: reportCount,
   };
@@ -206,12 +218,7 @@ export async function updateProduct(
   // Photo (optional) — replace the product's image if one was uploaded.
   const imageFile = formData.get("image");
   if (imageFile instanceof File && imageFile.size > 0) {
-    const { data: prod } = await admin
-      .from("products")
-      .select("sku")
-      .eq("id", id)
-      .maybeSingle<{ sku: string | null }>();
-    const img = await uploadProductImage(admin, prod?.sku || id, imageFile);
+    const img = await uploadProductImage(admin, sku || id, imageFile);
     if (img.error) return { error: img.error, success: null };
     if (img.url) update.image_url = img.url;
   }

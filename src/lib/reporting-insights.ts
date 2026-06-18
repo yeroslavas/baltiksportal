@@ -15,20 +15,32 @@ const BAGEL_GROUP = /bagel/i;
 
 type ItemRow = {
   quantity: number | string;
+  line_total: number | string;
   order_id: string;
   orders: {
     status: string;
     delivery_date: string | null;
     total_amount: number | string;
+    delivery_fee: number | string;
     customers: { business_name: string } | null;
   } | null;
   products: { report_group: string | null; report_count: number | null } | null;
 };
 
 const SELECT =
-  "quantity, order_id, " +
-  "orders!inner(status, delivery_date, total_amount, customers(business_name)), " +
+  "quantity, line_total, order_id, " +
+  "orders!inner(status, delivery_date, total_amount, delivery_fee, customers(business_name)), " +
   "products(report_group, report_count)";
+
+// Revenue bucket for a product's report_group (drives the breakdown pie).
+// "doz bagels" → Dozens, "Qt_CC"/"8oz_CC" → Cream cheese, everything else
+// (pack_bagels + any untagged product) → Packs.
+function revenueBucket(group: string | null): "dozens" | "creamCheese" | "packs" {
+  const g = (group ?? "").toLowerCase();
+  if (g.includes("doz")) return "dozens";
+  if (g.includes("cc")) return "creamCheese";
+  return "packs";
+}
 
 // Mon-first so the weekday chart reads like a work week.
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -51,6 +63,7 @@ export type Insights = {
   orderCount: number;
   topCustomers: { name: string; total: number }[];
   weekday: { label: string; avg: number }[]; // Mon … Sun
+  revenueBreakdown: { label: string; value: number }[]; // Dozens, Packs, CC, Fees
 };
 
 export async function getInsights(opts: {
@@ -82,10 +95,14 @@ export async function getInsights(opts: {
   }
 
   // Order-level facts deduped by order id (so revenue isn't multiplied by lines).
-  const orders = new Map<string, { total: number; customer: string }>();
+  const orders = new Map<
+    string,
+    { total: number; customer: string; deliveryFee: number }
+  >();
   let bagelsTotal = 0;
   const weekdayUnits = new Array(8).fill(0); // index by ISO weekday 1..7
   const weekdayDays: Array<Set<string>> = Array.from({ length: 8 }, () => new Set());
+  const rev = { dozens: 0, packs: 0, creamCheese: 0 };
 
   for (const r of rows) {
     const o = r.orders;
@@ -97,10 +114,14 @@ export async function getInsights(opts: {
       orders.set(r.order_id, {
         total: Number(o.total_amount) || 0,
         customer: o.customers?.business_name ?? "—",
+        deliveryFee: Number(o.delivery_fee) || 0,
       });
     }
 
     const p = r.products;
+    // Revenue split by product bucket (line totals; fees handled per order below).
+    rev[revenueBucket(p?.report_group ?? null)] += Number(r.line_total) || 0;
+
     if (p?.report_group && BAGEL_GROUP.test(p.report_group) && p.report_count != null) {
       const units = (Number(r.quantity) || 0) * Number(p.report_count);
       bagelsTotal += units;
@@ -111,9 +132,11 @@ export async function getInsights(opts: {
   }
 
   let revenueTotal = 0;
+  let deliveryFees = 0;
   const byCustomer = new Map<string, number>();
-  for (const { total, customer } of orders.values()) {
+  for (const { total, customer, deliveryFee } of orders.values()) {
     revenueTotal += total;
+    deliveryFees += deliveryFee;
     byCustomer.set(customer, (byCustomer.get(customer) ?? 0) + total);
   }
   const topCustomers = [...byCustomer.entries()]
@@ -135,5 +158,11 @@ export async function getInsights(opts: {
     orderCount: orders.size,
     topCustomers,
     weekday,
+    revenueBreakdown: [
+      { label: "Dozens", value: round2(rev.dozens) },
+      { label: "Packs", value: round2(rev.packs) },
+      { label: "Cream cheese", value: round2(rev.creamCheese) },
+      { label: "Delivery fees", value: round2(deliveryFees) },
+    ],
   };
 }
