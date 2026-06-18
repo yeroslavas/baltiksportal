@@ -42,6 +42,16 @@ function revenueBucket(group: string | null): "dozens" | "creamCheese" | "packs"
   return "packs";
 }
 
+// Sales channel for a product's report_group (drives the channel donut).
+// Foodservice = doz bagels + Qt_CC; Retail = pack_bagels + 8oz_CC. Untagged
+// groups return null (excluded from the channel split).
+function salesChannel(group: string | null): "foodservice" | "retail" | null {
+  const g = (group ?? "").toLowerCase();
+  if (g.includes("doz") || g.includes("qt")) return "foodservice";
+  if (g.includes("pack") || g.includes("8oz")) return "retail";
+  return null;
+}
+
 // Mon-first so the weekday chart reads like a work week.
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -64,6 +74,7 @@ export type Insights = {
   topCustomers: { name: string; total: number }[];
   weekday: { label: string; avg: number }[]; // Mon … Sun
   revenueBreakdown: { label: string; value: number }[]; // Dozens, Packs, CC, Fees
+  channelBreakdown: { label: string; value: number }[]; // Foodservice, Retail
 };
 
 export async function getInsights(opts: {
@@ -103,6 +114,7 @@ export async function getInsights(opts: {
   const weekdayUnits = new Array(8).fill(0); // index by ISO weekday 1..7
   const weekdayDays: Array<Set<string>> = Array.from({ length: 8 }, () => new Set());
   const rev = { dozens: 0, packs: 0, creamCheese: 0 };
+  const chan = { foodservice: 0, retail: 0 };
 
   for (const r of rows) {
     const o = r.orders;
@@ -119,8 +131,12 @@ export async function getInsights(opts: {
     }
 
     const p = r.products;
+    const lineTotal = Number(r.line_total) || 0;
     // Revenue split by product bucket (line totals; fees handled per order below).
-    rev[revenueBucket(p?.report_group ?? null)] += Number(r.line_total) || 0;
+    rev[revenueBucket(p?.report_group ?? null)] += lineTotal;
+    // Revenue split by sales channel (foodservice vs retail).
+    const ch = salesChannel(p?.report_group ?? null);
+    if (ch) chan[ch] += lineTotal;
 
     if (p?.report_group && BAGEL_GROUP.test(p.report_group) && p.report_count != null) {
       const units = (Number(r.quantity) || 0) * Number(p.report_count);
@@ -163,6 +179,10 @@ export async function getInsights(opts: {
       { label: "Packs", value: round2(rev.packs) },
       { label: "Cream cheese", value: round2(rev.creamCheese) },
       { label: "Delivery fees", value: round2(deliveryFees) },
+    ],
+    channelBreakdown: [
+      { label: "Foodservice", value: round2(chan.foodservice) },
+      { label: "Retail", value: round2(chan.retail) },
     ],
   };
 }
