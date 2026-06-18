@@ -21,6 +21,7 @@ const HEADERS: string[] = [
   "Order date",
   "Fulfillment",
   "Fulfillment date",
+  "Weekday",
   "Window",
   "Customer",
   "Contact",
@@ -81,6 +82,13 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 // Bagels per bake tray — bake_trays = bake_units / TRAY_SIZE.
 const TRAY_SIZE = 15;
 
+// Abbreviated weekday for a YYYY-MM-DD date (UTC-parsed to avoid tz drift).
+const WEEKDAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function weekdayAbbr(dateStr: string | null): string {
+  if (!dateStr) return "";
+  return WEEKDAY_ABBR[new Date(`${dateStr}T00:00:00Z`).getUTCDay()] ?? "";
+}
+
 // Human-readable Eastern time for the sheet's "Last synced" stamp (auto EST/EDT).
 // The SyncState keeps the raw UTC ISO for the admin "synced X ago" math.
 function formatEastern(iso: string): string {
@@ -131,6 +139,7 @@ async function buildOrderRows(): Promise<{ header: string[]; rows: Cell[][] }> {
       o.order_date.slice(0, 10),
       o.fulfillment_type,
       o.delivery_date ?? "",
+      weekdayAbbr(o.delivery_date),
       o.delivery_time ?? "",
       o.customers?.business_name ?? "",
       o.customers?.contact_name ?? "",
