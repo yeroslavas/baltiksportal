@@ -119,7 +119,7 @@ export async function getInsights(opts: {
   const topCustomers = [...byCustomer.entries()]
     .map(([name, total]) => ({ name, total: round2(total) }))
     .sort((a, b) => b.total - a.total)
-    .slice(0, 3);
+    .slice(0, 5);
 
   const weekday = WEEKDAY_LABELS.map((label, idx) => {
     const wd = idx + 1;

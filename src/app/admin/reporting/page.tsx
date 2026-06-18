@@ -18,6 +18,7 @@ export default async function AdminReportingPage({
   const { from, to } = await searchParams;
   const insights = await getInsights({ from, to });
   const maxWeekday = Math.max(1, ...insights.weekday.map((w) => w.avg));
+  const maxCustomer = Math.max(1, ...insights.topCustomers.map((c) => c.total));
 
   const configured = sheetsConfigured();
   const cfg = sheetsConfigSummary();
@@ -198,24 +199,31 @@ export default async function AdminReportingPage({
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div>
             <h3 className="text-sm font-semibold text-stone-700">
-              Top customers by volume
+              Top 5 customers by volume
             </h3>
             {insights.topCustomers.length === 0 ? (
               <p className="mt-2 text-sm text-stone-400">No orders in this range.</p>
             ) : (
-              <ol className="mt-3 space-y-2">
+              <ol className="mt-3 space-y-3">
                 {insights.topCustomers.map((c, i) => (
-                  <li
-                    key={c.name}
-                    className="flex items-center justify-between rounded-lg border border-stone-100 bg-stone-50 px-3 py-2 text-sm"
-                  >
-                    <span className="min-w-0 truncate text-stone-700">
-                      <span className="mr-1 text-stone-400">{i + 1}.</span>
-                      {c.name}
-                    </span>
-                    <span className="ml-3 shrink-0 font-semibold text-stone-900">
-                      {formatPrice(c.total)}
-                    </span>
+                  <li key={c.name}>
+                    <div className="flex items-baseline justify-between gap-3 text-sm">
+                      <span className="min-w-0 truncate text-stone-700">
+                        <span className="mr-1 text-stone-400">{i + 1}.</span>
+                        {c.name}
+                      </span>
+                      <span className="shrink-0 font-semibold text-stone-900">
+                        {formatPrice(c.total)}
+                      </span>
+                    </div>
+                    <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-stone-100">
+                      <div
+                        className="h-full rounded-full bg-brand-500"
+                        style={{
+                          width: `${Math.max(2, Math.round((c.total / maxCustomer) * 100))}%`,
+                        }}
+                      />
+                    </div>
                   </li>
                 ))}
               </ol>
