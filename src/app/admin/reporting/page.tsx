@@ -226,22 +226,29 @@ export default async function AdminReportingPage({
             <h3 className="text-sm font-semibold text-stone-700">
               Avg bagels delivered per weekday
             </h3>
-            <div className="mt-3 flex h-40 items-end gap-2">
-              {insights.weekday.map((w) => (
-                <div
-                  key={w.label}
-                  className="flex flex-1 flex-col items-center justify-end gap-1"
-                >
-                  <span className="text-xs font-medium text-stone-600">
-                    {w.avg.toLocaleString()}
-                  </span>
+            <div className="mt-3 flex h-40 items-end gap-2 border-b border-stone-200">
+              {insights.weekday.map((w) => {
+                // Pixel height (not %) so bars render regardless of flex sizing.
+                const px =
+                  w.avg > 0
+                    ? Math.max(4, Math.round((w.avg / maxWeekday) * 140))
+                    : 0;
+                return (
                   <div
-                    className="w-full rounded-t bg-brand-500"
-                    style={{ height: `${Math.round((w.avg / maxWeekday) * 100)}%` }}
-                    title={`${w.label}: ${w.avg}`}
-                  />
-                </div>
-              ))}
+                    key={w.label}
+                    className="flex flex-1 flex-col items-center justify-end gap-1"
+                  >
+                    <span className="text-xs font-medium text-stone-600">
+                      {w.avg.toLocaleString()}
+                    </span>
+                    <div
+                      className="w-full rounded-t bg-brand-500"
+                      style={{ height: `${px}px` }}
+                      title={`${w.label}: ${w.avg.toLocaleString()}`}
+                    />
+                  </div>
+                );
+              })}
             </div>
             <div className="mt-1 flex gap-2">
               {insights.weekday.map((w) => (
