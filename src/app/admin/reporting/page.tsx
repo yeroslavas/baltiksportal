@@ -7,8 +7,20 @@ import { SyncSheetButton } from "./sync-sheet-button";
 export const dynamic = "force-dynamic";
 
 const cardClass = "rounded-xl border border-stone-200 bg-stone-50 px-4 py-3";
-// Slice colors for the revenue breakdown (Dozens, Packs, Cream cheese, Fees).
-const RB_COLORS = ["#b45309", "#15803d", "#2563eb", "#78716c"];
+// Revenue-breakdown slice colors from the brand palette (logo navy + peach).
+// Order: Dozens, Packs, Cream cheese, Delivery fees. `text` is the on-slice
+// label color, chosen for contrast against `fill`.
+const RB_COLORS = [
+  { fill: "#305277", text: "#ffffff" }, // brand navy
+  { fill: "#87a9cf", text: "#1f354c" }, // brand-300 (light blue)
+  { fill: "#f6c2b1", text: "#1f354c" }, // peach
+  { fill: "#1f354c", text: "#ffffff" }, // brand-800 (deep navy)
+];
+const DONUT_SIZE = 168;
+const DONUT_STROKE = 34;
+const DONUT_R = (DONUT_SIZE - DONUT_STROKE) / 2;
+const DONUT_C = 2 * Math.PI * DONUT_R;
+const DONUT_MID = DONUT_SIZE / 2;
 const slicerInput =
   "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200";
 
@@ -22,20 +34,7 @@ export default async function AdminReportingPage({
   const maxWeekday = Math.max(1, ...insights.weekday.map((w) => w.avg));
   const maxCustomer = Math.max(1, ...insights.topCustomers.map((c) => c.total));
 
-  // Revenue breakdown pie: build a conic-gradient from cumulative shares.
-  // (No mutable accumulator — each slice sums the prior values itself; n=4.)
   const rbTotal = insights.revenueBreakdown.reduce((s, b) => s + b.value, 0);
-  const rbStops = insights.revenueBreakdown
-    .map((b, i) => {
-      const prior = insights.revenueBreakdown
-        .slice(0, i)
-        .reduce((s, x) => s + x.value, 0);
-      const start = rbTotal > 0 ? (prior / rbTotal) * 100 : 0;
-      const end = rbTotal > 0 ? ((prior + b.value) / rbTotal) * 100 : 0;
-      return `${RB_COLORS[i]} ${start}% ${end}%`;
-    })
-    .join(", ");
-  const rbGradient = `conic-gradient(${rbStops})`;
 
   const configured = sheetsConfigured();
   const cfg = sheetsConfigSummary();
@@ -299,12 +298,59 @@ export default async function AdminReportingPage({
             <p className="mt-2 text-sm text-stone-400">No revenue in this range.</p>
           ) : (
             <div className="mt-3 flex flex-wrap items-center gap-8">
-              <div
-                className="relative h-40 w-40 shrink-0 rounded-full"
-                style={{ background: rbGradient }}
+              <svg
+                viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`}
+                width={DONUT_SIZE}
+                height={DONUT_SIZE}
+                className="shrink-0"
+                role="img"
+                aria-label="Revenue breakdown"
               >
-                <div className="absolute inset-[28%] rounded-full bg-white" />
-              </div>
+                {insights.revenueBreakdown.map((b, i) => {
+                  const prior = insights.revenueBreakdown
+                    .slice(0, i)
+                    .reduce((s, x) => s + x.value, 0);
+                  const frac = b.value / rbTotal;
+                  if (frac <= 0) return null;
+                  return (
+                    <circle
+                      key={b.label}
+                      cx={DONUT_MID}
+                      cy={DONUT_MID}
+                      r={DONUT_R}
+                      fill="none"
+                      stroke={RB_COLORS[i].fill}
+                      strokeWidth={DONUT_STROKE}
+                      strokeDasharray={`${frac * DONUT_C} ${DONUT_C}`}
+                      strokeDashoffset={-((prior / rbTotal) * DONUT_C)}
+                      transform={`rotate(-90 ${DONUT_MID} ${DONUT_MID})`}
+                    />
+                  );
+                })}
+                {insights.revenueBreakdown.map((b, i) => {
+                  const prior = insights.revenueBreakdown
+                    .slice(0, i)
+                    .reduce((s, x) => s + x.value, 0);
+                  const pct = (b.value / rbTotal) * 100;
+                  if (pct < 5) return null; // skip tiny slices (legend still shows them)
+                  const mid = (prior + b.value / 2) / rbTotal;
+                  const ang = mid * 2 * Math.PI - Math.PI / 2;
+                  return (
+                    <text
+                      key={b.label}
+                      x={DONUT_MID + DONUT_R * Math.cos(ang)}
+                      y={DONUT_MID + DONUT_R * Math.sin(ang)}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fontSize="13"
+                      fontWeight="600"
+                      fill={RB_COLORS[i].text}
+                    >
+                      {Math.round(pct)}%
+                    </text>
+                  );
+                })}
+              </svg>
               <ul className="min-w-[260px] flex-1 space-y-2">
                 {insights.revenueBreakdown.map((b, i) => {
                   const pct = rbTotal > 0 ? (b.value / rbTotal) * 100 : 0;
@@ -312,7 +358,7 @@ export default async function AdminReportingPage({
                     <li key={b.label} className="flex items-center gap-3 text-sm">
                       <span
                         className="h-3 w-3 shrink-0 rounded-sm"
-                        style={{ background: RB_COLORS[i] }}
+                        style={{ background: RB_COLORS[i].fill }}
                       />
                       <span className="flex-1 text-stone-700">{b.label}</span>
                       <span className="font-medium text-stone-900">
