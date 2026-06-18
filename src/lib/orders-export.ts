@@ -34,9 +34,13 @@ const HEADERS: string[] = [
   "Bake units",
   "Unit price",
   "Line total",
+  "Order total", // order-level; written once per order (first row) so it sums cleanly
   "From standing order",
   "Order ID",
 ];
+
+const ORDER_TOTAL_COL = HEADERS.indexOf("Order total");
+const ORDER_ID_COL = HEADERS.indexOf("Order ID");
 
 type ItemRow = {
   product_name: string;
@@ -51,6 +55,7 @@ type ItemRow = {
     fulfillment_type: string;
     delivery_date: string | null;
     delivery_time: string | null;
+    total_amount: number | string;
     standing_order_id: string | null;
     customers: { business_name: string; contact_name: string | null } | null;
   } | null;
@@ -65,7 +70,7 @@ type ItemRow = {
 
 const SELECT =
   "product_name, quantity, unit_price, line_total, order_id, " +
-  "orders!inner(order_number, status, order_date, fulfillment_type, delivery_date, delivery_time, standing_order_id, customers(business_name, contact_name)), " +
+  "orders!inner(order_number, status, order_date, fulfillment_type, delivery_date, delivery_time, total_amount, standing_order_id, customers(business_name, contact_name)), " +
   "products(sku, report_group, report_unit, report_count, bake_time)";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -116,6 +121,7 @@ async function buildOrderRows(): Promise<{ header: string[]; rows: Cell[][] }> {
       bakeUnits,
       round2(Number(it.unit_price)),
       round2(Number(it.line_total)),
+      round2(Number(o.total_amount)), // blanked below for all but each order's first row
       o.standing_order_id ? "yes" : "no",
       it.order_id,
     ]);
@@ -133,6 +139,16 @@ async function buildOrderRows(): Promise<{ header: string[]; rows: Cell[][] }> {
     }
     return Number(a[0]) - Number(b[0]);
   });
+
+  // Keep the order total on only the FIRST row of each order (now that rows are
+  // sorted, same-order lines are contiguous) so summing the column = gross
+  // order volume, with no per-line-item double-counting.
+  const seenOrders = new Set<string>();
+  for (const row of rows) {
+    const oid = String(row[ORDER_ID_COL]);
+    if (seenOrders.has(oid)) row[ORDER_TOTAL_COL] = "";
+    else seenOrders.add(oid);
+  }
 
   return { header: HEADERS, rows };
 }
