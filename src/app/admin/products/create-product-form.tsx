@@ -151,6 +151,10 @@ export function CreateProductForm({
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-stone-700">Report group</label>
         <input name="report_group" placeholder="e.g. bagels" className={inputClass} />
+        <p className="text-xs text-stone-400">
+          Auto-set from the SKU (Bulk_ / 4-pk_ / QT_ / 8oz_). Used only if the
+          SKU matches no pattern.
+        </p>
       </div>
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-stone-700">Report unit</label>

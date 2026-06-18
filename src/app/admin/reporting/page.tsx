@@ -7,6 +7,8 @@ import { SyncSheetButton } from "./sync-sheet-button";
 export const dynamic = "force-dynamic";
 
 const cardClass = "rounded-xl border border-stone-200 bg-stone-50 px-4 py-3";
+// Slice colors for the revenue breakdown (Dozens, Packs, Cream cheese, Fees).
+const RB_COLORS = ["#b45309", "#15803d", "#2563eb", "#78716c"];
 const slicerInput =
   "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200";
 
@@ -19,6 +21,21 @@ export default async function AdminReportingPage({
   const insights = await getInsights({ from, to });
   const maxWeekday = Math.max(1, ...insights.weekday.map((w) => w.avg));
   const maxCustomer = Math.max(1, ...insights.topCustomers.map((c) => c.total));
+
+  // Revenue breakdown pie: build a conic-gradient from cumulative shares.
+  // (No mutable accumulator — each slice sums the prior values itself; n=4.)
+  const rbTotal = insights.revenueBreakdown.reduce((s, b) => s + b.value, 0);
+  const rbStops = insights.revenueBreakdown
+    .map((b, i) => {
+      const prior = insights.revenueBreakdown
+        .slice(0, i)
+        .reduce((s, x) => s + x.value, 0);
+      const start = rbTotal > 0 ? (prior / rbTotal) * 100 : 0;
+      const end = rbTotal > 0 ? ((prior + b.value) / rbTotal) * 100 : 0;
+      return `${RB_COLORS[i]} ${start}% ${end}%`;
+    })
+    .join(", ");
+  const rbGradient = `conic-gradient(${rbStops})`;
 
   const configured = sheetsConfigured();
   const cfg = sheetsConfigSummary();
@@ -272,6 +289,44 @@ export default async function AdminReportingPage({
               Average per delivery day on that weekday, within the selected range.
             </p>
           </div>
+        </div>
+
+        <div className="border-t border-stone-100 pt-5">
+          <h3 className="text-sm font-semibold text-stone-700">
+            Revenue breakdown
+          </h3>
+          {rbTotal <= 0 ? (
+            <p className="mt-2 text-sm text-stone-400">No revenue in this range.</p>
+          ) : (
+            <div className="mt-3 flex flex-wrap items-center gap-8">
+              <div
+                className="relative h-40 w-40 shrink-0 rounded-full"
+                style={{ background: rbGradient }}
+              >
+                <div className="absolute inset-[28%] rounded-full bg-white" />
+              </div>
+              <ul className="min-w-[260px] flex-1 space-y-2">
+                {insights.revenueBreakdown.map((b, i) => {
+                  const pct = rbTotal > 0 ? (b.value / rbTotal) * 100 : 0;
+                  return (
+                    <li key={b.label} className="flex items-center gap-3 text-sm">
+                      <span
+                        className="h-3 w-3 shrink-0 rounded-sm"
+                        style={{ background: RB_COLORS[i] }}
+                      />
+                      <span className="flex-1 text-stone-700">{b.label}</span>
+                      <span className="font-medium text-stone-900">
+                        {formatPrice(b.value)}
+                      </span>
+                      <span className="w-10 text-right text-stone-400">
+                        {pct.toFixed(0)}%
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </div>
       </section>
     </div>
