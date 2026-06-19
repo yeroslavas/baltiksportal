@@ -151,15 +151,21 @@ export async function createOrderForCustomer(opts: {
   // Standing-order generation prefers to drop unavailable items rather than
   // fail the whole order; checkout keeps the strict behavior (default).
   skipUnavailable?: boolean;
+  // Pre-priced snapshot (pay-first): when provided, use these exact prices
+  // instead of re-pricing, so the created order/invoice match what Stripe
+  // actually charged — prices can drift between checkout and ACH settlement.
+  priced?: PricedOrder;
 }): Promise<CreateOrderResult> {
   const { type, date, standingOrderId } = opts;
 
-  const priced = await priceOrder({
-    customerId: opts.customerId,
-    lines: opts.lines,
-    type,
-    skipUnavailable: opts.skipUnavailable,
-  });
+  const priced =
+    opts.priced ??
+    (await priceOrder({
+      customerId: opts.customerId,
+      lines: opts.lines,
+      type,
+      skipUnavailable: opts.skipUnavailable,
+    }));
   if ("error" in priced) return { error: priced.error };
   const { customer, items: orderItems, deliveryFee, total } = priced;
 

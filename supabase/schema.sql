@@ -249,8 +249,13 @@ create table if not exists public.pending_orders (
   fulfillment_type text not null default 'delivery'
                      check (fulfillment_type in ('delivery', 'pickup')),
   delivery_date    date not null,
+  -- Snapshot of the priced order (PricedOrder: items, fee, total) at checkout,
+  -- so the webhook materializes the order at the exact price charged even if
+  -- catalog prices change before ACH settles. Null on rows predating this.
+  priced           jsonb,
   created_at       timestamptz not null default now()
 );
+alter table public.pending_orders add column if not exists priced jsonb;
 
 alter table public.pending_orders enable row level security;
 -- No policies: created/consumed server-side with the service_role key only.

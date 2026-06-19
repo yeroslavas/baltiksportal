@@ -1,9 +1,9 @@
 import type Stripe from "stripe";
 import { getStripe, stripeWebhookSecret } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createOrderForCustomer } from "@/lib/orders";
+import { createOrderForCustomer, type PricedOrder } from "@/lib/orders";
 import { getSettings } from "@/lib/settings";
-import { sendPaymentReceipt } from "@/lib/email";
+import { sendPaymentReceipt, sendAdminPaymentFailedAlert } from "@/lib/email";
 import { formatPrice, formatDate } from "@/lib/format";
 
 export const runtime = "nodejs"; // Stripe SDK needs Node crypto.
@@ -49,6 +49,22 @@ export async function POST(req: Request): Promise<Response> {
     if (session.payment_status === "paid") {
       await markPaid(session);
     }
+  } else if (event.type === "checkout.session.async_payment_failed") {
+    // ACH bounced/returned (NSF, closed account, revoked mandate). We don't
+    // auto-cancel (the order may already be in production) — we flag the
+    // invoice and alert the admin to follow up.
+    await flagPaymentFailed(event.data.object as Stripe.Checkout.Session);
+  } else if (event.type === "checkout.session.expired") {
+    // Abandoned pay-first checkout — the order was never created. Clean up the
+    // stale hold so it doesn't linger.
+    const session = event.data.object as Stripe.Checkout.Session;
+    const pendingId = session.metadata?.pending_order_id;
+    if (pendingId) {
+      await createAdminClient()
+        .from("pending_orders")
+        .delete()
+        .eq("id", pendingId);
+    }
   }
 
   return Response.json({ received: true });
@@ -86,6 +102,7 @@ async function materializePendingOrder(session: Stripe.Checkout.Session) {
       lines: { productId: string; quantity: number }[];
       fulfillment_type: "delivery" | "pickup";
       delivery_date: string;
+      priced: PricedOrder | null;
     }>();
   if (!pending) return; // already consumed / gone
 
@@ -94,6 +111,9 @@ async function materializePendingOrder(session: Stripe.Checkout.Session) {
     lines: pending.lines ?? [],
     type: pending.fulfillment_type,
     date: pending.delivery_date,
+    // Materialize at the exact price charged (falls back to re-pricing for
+    // older pending rows written before the snapshot existed).
+    priced: pending.priced ?? undefined,
   });
   if (res.error || !res.orderId) {
     // Leave the pending row as evidence for manual recovery (customer paid).
@@ -175,4 +195,64 @@ async function markPaid(session: Stripe.Checkout.Session) {
       businessName: settings.businessName,
     });
   }
+}
+
+// Resolve which invoices a session's payment covers (single / batch / pay-first).
+async function invoiceIdsForSession(
+  admin: ReturnType<typeof createAdminClient>,
+  session: Stripe.Checkout.Session,
+): Promise<string[]> {
+  const invoiceId = session.metadata?.invoice_id;
+  const batchId = session.metadata?.batch_id;
+  const pi = paymentIntentId(session);
+  if (invoiceId) return [invoiceId];
+  if (batchId) {
+    const { data: batch } = await admin
+      .from("payment_batches")
+      .select("invoice_ids")
+      .eq("id", batchId)
+      .maybeSingle<{ invoice_ids: string[] }>();
+    return batch?.invoice_ids ?? [];
+  }
+  if (pi) {
+    const { data: tagged } = await admin
+      .from("invoices")
+      .select("id")
+      .eq("stripe_payment_id", pi);
+    return (tagged ?? []).map((t) => t.id);
+  }
+  return [];
+}
+
+// ACH failed/returned: flag the still-unpaid invoice(s) with a note (don't
+// cancel — the order may already be in production) and alert the admin.
+async function flagPaymentFailed(session: Stripe.Checkout.Session) {
+  const admin = createAdminClient();
+  const targetIds = await invoiceIdsForSession(admin, session);
+  if (targetIds.length === 0) return;
+
+  const note = `⚠ ACH payment failed/returned ${formatDate(new Date().toISOString())} — follow up`;
+  const { data: flagged } = await admin
+    .from("invoices")
+    .update({ payment_note: note })
+    .in("id", targetIds)
+    .in("status", ["unpaid", "overdue"]) // don't touch already-paid/canceled
+    .select("invoice_number, total_amount, customer_id");
+  const rows = flagged ?? [];
+  if (rows.length === 0) return;
+
+  const settings = await getSettings();
+  const { data: customer } = await admin
+    .from("customers")
+    .select("business_name")
+    .eq("id", rows[0].customer_id)
+    .maybeSingle<{ business_name: string | null }>();
+  const totalFailed = rows.reduce((s, r) => s + Number(r.total_amount), 0);
+  await sendAdminPaymentFailedAlert({
+    invoiceLabel:
+      rows.length === 1 ? rows[0].invoice_number : `${rows.length} invoices`,
+    customerName: customer?.business_name ?? "a customer",
+    amountDisplay: formatPrice(totalFailed),
+    businessName: settings.businessName,
+  });
 }

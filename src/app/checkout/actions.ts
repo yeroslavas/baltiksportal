@@ -149,6 +149,9 @@ export async function placeOrder(
       lines: cleanLines,
       fulfillment_type: type,
       delivery_date: date,
+      // Snapshot the priced order so the webhook materializes it at the exact
+      // price charged, even if catalog prices change before ACH settles.
+      priced,
     })
     .select("id")
     .single();
