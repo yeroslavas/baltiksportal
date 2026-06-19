@@ -38,7 +38,9 @@ export async function savePricing(
     }
 
     const price = Number(value);
-    if (Number.isNaN(price) || price < 0) {
+    // Number.isFinite rejects NaN AND Infinity (Number("Infinity") is finite-false
+    // but not NaN, so it would otherwise slip through and poison every total).
+    if (!Number.isFinite(price) || price < 0) {
       return {
         error: "All custom prices must be 0 or more (leave blank to clear).",
         success: null,

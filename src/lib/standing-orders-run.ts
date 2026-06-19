@@ -41,12 +41,13 @@ export async function generateStandingOrders(
 
   if (active.length > 0) {
     // Customers with overdue invoices are locked out of new orders — including
-    // auto-generated standing orders — until they pay.
+    // auto-generated standing orders — until they pay. Must match the canonical
+    // check in getOverdueInvoices(): ANY 'overdue' invoice (e.g. a manual early
+    // credit hold with a future due date) OR an unpaid invoice now past due.
     const { data: overdueRows } = await admin
       .from("invoices")
       .select("customer_id")
-      .in("status", ["unpaid", "overdue"])
-      .lt("due_date", today);
+      .or(`status.eq.overdue,and(status.eq.unpaid,due_date.lt.${today})`);
     const lockedCustomers = new Set(
       (overdueRows ?? []).map((r) => r.customer_id),
     );
