@@ -101,3 +101,84 @@ export async function sendAdminPaymentFailedAlert(opts: {
     console.error("Resend alert error:", e);
   }
 }
+
+async function sendViaResend(opts: {
+  to: string;
+  subject: string;
+  html: string;
+  from: string;
+}): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey || !opts.to) return;
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: opts.from,
+        to: [opts.to],
+        subject: opts.subject,
+        html: opts.html,
+      }),
+    });
+    if (!res.ok) console.error("Resend send failed:", res.status, await res.text());
+  } catch (e) {
+    console.error("Resend send error:", e);
+  }
+}
+
+// Alert the admin that an auto-pay charge failed (and whether it disabled
+// auto-pay for that customer). To the first ADMIN_EMAILS address.
+export async function sendAutopayFailedAlert(opts: {
+  customerName: string;
+  reason: string;
+  disabled: boolean;
+  businessName: string;
+}): Promise<void> {
+  const to = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean)[0];
+  if (!to) return;
+  const from =
+    process.env.RESEND_FROM || `${opts.businessName} <onboarding@resend.dev>`;
+  const html = `
+    <div style="font-family:system-ui,Arial,sans-serif;max-width:480px;margin:0 auto;color:#1c1917">
+      <h2 style="margin:0 0 8px">⚠ Auto-pay charge failed</h2>
+      <p style="margin:0 0 12px;color:#57534e">An automatic invoice payment failed for <strong>${opts.customerName}</strong>.</p>
+      <p style="margin:0 0 12px;color:#57534e">Reason: ${opts.reason}</p>
+      ${opts.disabled ? `<p style="margin:0 0 12px;color:#b91c1c"><strong>Auto-pay has been turned off for this customer</strong> after repeated failures — follow up to collect manually.</p>` : `<p style="margin:0 0 12px;color:#57534e">Auto-pay will retry on the next run.</p>`}
+      <p style="margin:20px 0 0;color:#78716c;font-size:13px">${opts.businessName}</p>
+    </div>`;
+  await sendViaResend({
+    to,
+    from,
+    subject: `⚠ Auto-pay failed — ${opts.customerName}`,
+    html,
+  });
+}
+
+// Tell a customer their auto-pay was turned off after repeated failed debits.
+export async function sendAutopayDisabledEmail(opts: {
+  to: string;
+  businessName: string;
+}): Promise<void> {
+  const from =
+    process.env.RESEND_FROM || `${opts.businessName} <onboarding@resend.dev>`;
+  const html = `
+    <div style="font-family:system-ui,Arial,sans-serif;max-width:480px;margin:0 auto;color:#1c1917">
+      <h2 style="margin:0 0 8px">Auto-pay turned off</h2>
+      <p style="margin:0 0 16px;color:#57534e">We tried to charge your saved bank account for a recent invoice, but it didn't go through after a couple of attempts — so we've turned off auto-pay on your account.</p>
+      <p style="margin:0 0 16px;color:#57534e">Please pay any open invoices from your portal, and you can re-enable auto-pay anytime on the Invoices page.</p>
+      <p style="margin:20px 0 0;color:#78716c;font-size:13px">${opts.businessName}</p>
+    </div>`;
+  await sendViaResend({
+    to: opts.to,
+    from,
+    subject: `Auto-pay turned off — action needed`,
+    html,
+  });
+}
