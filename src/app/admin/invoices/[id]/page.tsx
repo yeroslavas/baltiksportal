@@ -3,8 +3,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice, formatDate, formatDateOnly } from "@/lib/format";
 import { InvoiceStatusForm } from "../invoice-status-form";
 import { PaymentNoteForm } from "../payment-note-form";
+import { ApplyCreditForm } from "../apply-credit-form";
 import { FulfillmentInfo } from "@/components/fulfillment-info";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
+import { invoiceAmountDue } from "@/lib/invoices";
 import type { Invoice, Order, OrderItem } from "@/lib/types";
 
 type InvoiceWithRefs = Invoice & {
@@ -55,6 +57,9 @@ export default async function AdminInvoiceDetailPage({
   ]);
   const items = (itemsData ?? []) as OrderItem[];
   const deliveryFee = order?.delivery_fee ?? 0;
+  const credit = Number(invoice.credit_amount ?? 0);
+  const amountDue = invoiceAmountDue(invoice);
+  const canCredit = invoice.status === "unpaid" || invoice.status === "overdue";
 
   return (
     <div className="space-y-8">
@@ -142,6 +147,30 @@ export default async function AdminInvoiceDetailPage({
         <PaymentNoteForm id={invoice.id} note={invoice.payment_note} />
       </section>
 
+      <section className="space-y-3 rounded-2xl border border-stone-200 bg-white px-6 py-4 shadow-sm">
+        <div>
+          <h2 className="font-semibold text-stone-900">Credits & adjustments</h2>
+          <p className="mt-0.5 text-sm text-stone-500">
+            Reduce the amount due for a shorted/damaged order or a pricing fix. A
+            credit covering the full balance settles the invoice.
+          </p>
+        </div>
+        {credit > 0 ? (
+          <p className="rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-700">
+            <span className="font-medium">{formatPrice(credit)} credited</span>
+            {invoice.credit_reason ? ` — ${invoice.credit_reason}` : ""}
+          </p>
+        ) : null}
+        {canCredit ? (
+          <ApplyCreditForm id={invoice.id} amountDue={amountDue} />
+        ) : (
+          <p className="text-sm text-stone-400">
+            This invoice is {invoice.status} — credits can only be applied while
+            it&apos;s unpaid.
+          </p>
+        )}
+      </section>
+
       <section className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm">
         <table className="w-full min-w-[36rem] text-left text-sm">
           <thead className="text-xs uppercase tracking-wide text-stone-500">
@@ -189,12 +218,32 @@ export default async function AdminInvoiceDetailPage({
                 </td>
               </tr>
             ) : null}
+            {credit > 0 ? (
+              <>
+                <tr>
+                  <td colSpan={3} className="px-6 py-2 text-right text-sm text-stone-500">
+                    Order total
+                  </td>
+                  <td className="px-6 py-2 text-right text-sm text-stone-900">
+                    {formatPrice(invoice.total_amount)}
+                  </td>
+                </tr>
+                <tr>
+                  <td colSpan={3} className="px-6 py-2 text-right text-sm text-green-700">
+                    Credit
+                  </td>
+                  <td className="px-6 py-2 text-right text-sm text-green-700">
+                    −{formatPrice(credit)}
+                  </td>
+                </tr>
+              </>
+            ) : null}
             <tr className="border-t border-stone-200">
               <td colSpan={3} className="px-6 py-3 text-right text-sm font-medium text-stone-700">
-                Total due
+                Amount due
               </td>
               <td className="px-6 py-3 text-right text-lg font-bold text-stone-900">
-                {formatPrice(invoice.total_amount)}
+                {formatPrice(amountDue)}
               </td>
             </tr>
           </tfoot>

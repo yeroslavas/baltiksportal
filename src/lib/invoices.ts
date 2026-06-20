@@ -8,6 +8,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { businessToday, addDays } from "@/lib/standing-orders";
 
+// What a customer actually owes on an invoice: total minus any admin credit,
+// clamped at 0. The single source of truth for "amount due" — used by the
+// payment flow, the PDF, the outstanding totals, and the customer views.
+export function invoiceAmountDue(inv: {
+  total_amount: number | string;
+  credit_amount?: number | string | null;
+}): number {
+  const total = Number(inv.total_amount) || 0;
+  const credit = Number(inv.credit_amount ?? 0) || 0;
+  return Math.max(0, Math.round((total - credit) * 100) / 100);
+}
+
 export type CreateInvoiceResult = {
   // The new invoice's id, or null when one already existed (or on error).
   invoiceId: string | null;

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CustomerHeader } from "@/components/customer-header";
 import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/pagination";
 import { InvoicePayList } from "./invoice-pay-list";
+import { invoiceAmountDue } from "@/lib/invoices";
 import type { Invoice } from "@/lib/types";
 
 // The invoice list joins each invoice's order to show the order date alongside
@@ -84,6 +85,7 @@ export default async function InvoicesPage({
                 id: inv.id,
                 invoice_number: inv.invoice_number,
                 total_amount: Number(inv.total_amount),
+                amount_due: invoiceAmountDue(inv),
                 status: inv.status,
                 due_date: inv.due_date,
                 order_date: inv.orders?.order_date ?? null,

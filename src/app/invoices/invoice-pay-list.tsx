@@ -11,6 +11,7 @@ export type InvoiceListItem = {
   id: string;
   invoice_number: string;
   total_amount: number;
+  amount_due: number; // total minus any admin credit
   status: InvoiceStatus;
   due_date: string;
   order_date: string | null;
@@ -36,7 +37,7 @@ export function InvoicePayList({
 
   const selectedTotal = invoices
     .filter((i) => selected.has(i.id))
-    .reduce((s, i) => s + i.total_amount, 0);
+    .reduce((s, i) => s + i.amount_due, 0);
 
   return (
     <form action={payInvoices}>
@@ -75,8 +76,15 @@ export function InvoicePayList({
                 </div>
                 <div className="flex items-center gap-4">
                   <InvoiceStatusBadge status={inv.status} />
-                  <span className="w-20 text-right font-semibold text-stone-900">
-                    {formatPrice(inv.total_amount)}
+                  <span className="w-24 text-right">
+                    <span className="block font-semibold text-stone-900">
+                      {formatPrice(inv.amount_due)}
+                    </span>
+                    {inv.amount_due < inv.total_amount ? (
+                      <span className="block text-[11px] text-green-700">
+                        credit applied
+                      </span>
+                    ) : null}
                   </span>
                 </div>
               </Link>

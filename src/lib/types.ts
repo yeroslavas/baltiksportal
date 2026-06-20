@@ -139,6 +139,10 @@ export type Invoice = {
   due_date: string; // "YYYY-MM-DD" (default 30 days after issue)
   status: InvoiceStatus;
   total_amount: number;
+  // Admin-applied credit/adjustment (shorted/damaged order, pricing fix). The
+  // amount actually owed is total_amount − credit_amount (clamped ≥ 0).
+  credit_amount: number;
+  credit_reason: string | null;
   paid_at: string | null;
   // Internal admin note for off-platform payments (e.g. check #).
   payment_note: string | null;
