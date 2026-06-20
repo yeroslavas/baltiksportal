@@ -8,8 +8,34 @@ import {
   markOverdueInvoices,
   invoiceAmountDue,
 } from "@/lib/invoices";
+import { runAutopayCharges } from "@/lib/autopay-run";
 import { formatPrice } from "@/lib/format";
 import { INVOICE_STATUSES, type InvoiceStatus } from "@/lib/types";
+
+export type RunAutopayState = { message: string | null; error: string | null };
+
+// Run the auto-pay charge cycle on demand (manual fallback for the daily cron).
+// Idempotent — invoices already mid-charge are skipped.
+export async function runAutopayNow(
+  _prev: RunAutopayState,
+  _formData: FormData,
+): Promise<RunAutopayState> {
+  await requireAdmin();
+  const s = await runAutopayCharges();
+  revalidatePath("/admin/invoices");
+
+  const base =
+    s.charged > 0
+      ? `Charged ${s.charged} invoice${s.charged === 1 ? "" : "s"}.`
+      : "No invoices were due for auto-pay.";
+  const extra: string[] = [];
+  if (s.skipped) extra.push(`${s.skipped} skipped`);
+  if (s.failed) extra.push(`${s.failed} failed`);
+  return {
+    message: extra.length ? `${base} (${extra.join(", ")})` : base,
+    error: s.errors.length ? s.errors.slice(0, 3).join("; ") : null,
+  };
+}
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 

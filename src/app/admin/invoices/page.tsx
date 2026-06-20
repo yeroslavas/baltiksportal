@@ -7,8 +7,16 @@ import { SortableHeader, type SortDir } from "@/components/sortable-header";
 import { businessToday } from "@/lib/standing-orders";
 import { InvoiceStatusForm } from "./invoice-status-form";
 import { RecomputeOverdueButton } from "./recompute-overdue-button";
+import { RunAutopayButton } from "./run-autopay-button";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import type { Invoice } from "@/lib/types";
+
+type EnrolledCustomer = {
+  id: string;
+  business_name: string;
+  autopay_bank_last4: string | null;
+  autopay_fail_count: number;
+};
 
 type InvoiceRow = Invoice & {
   customers: { business_name: string } | null;
@@ -62,10 +70,17 @@ export default async function AdminInvoicesPage({
   if (sort !== "invoice") {
     invQuery = invQuery.order("invoice_number", { ascending: false }); // stable tiebreak
   }
-  const [{ data, count }, { data: summaryRows }] = await Promise.all([
-    invQuery.range(from, to),
-    admin.rpc("invoice_summary"),
-  ]);
+  const [{ data, count }, { data: summaryRows }, { data: enrolledRows }] =
+    await Promise.all([
+      invQuery.range(from, to),
+      admin.rpc("invoice_summary"),
+      admin
+        .from("customers")
+        .select("id, business_name, autopay_bank_last4, autopay_fail_count")
+        .eq("autopay_enabled", true)
+        .order("business_name"),
+    ]);
+  const enrolled = (enrolledRows ?? []) as EnrolledCustomer[];
   const invoices = (data ?? []) as InvoiceRow[];
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
@@ -108,6 +123,38 @@ export default async function AdminInvoicesPage({
           </div>
         ))}
       </div>
+
+      <section className="space-y-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-stone-900">Auto-pay</h2>
+            <p className="mt-0.5 max-w-xl text-sm text-stone-500">
+              {enrolled.length} customer{enrolled.length === 1 ? "" : "s"}{" "}
+              enrolled — due invoices charge automatically each day. Run now to
+              charge any due invoices immediately.
+            </p>
+          </div>
+          <RunAutopayButton />
+        </div>
+        {enrolled.length > 0 ? (
+          <ul className="flex flex-wrap gap-2">
+            {enrolled.map((c) => (
+              <li
+                key={c.id}
+                className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs text-stone-600"
+              >
+                {c.business_name}
+                {c.autopay_bank_last4 ? ` ••${c.autopay_bank_last4}` : ""}
+                {c.autopay_fail_count > 0 ? (
+                  <span className="ml-1 font-medium text-amber-700">
+                    ⚠ {c.autopay_fail_count}
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
 
       <form
         action="/admin/invoices/day-pdf"
