@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
+import { invoiceAmountDue } from "@/lib/invoices";
 
 // Create a hosted Stripe Checkout session for an invoice and redirect to it.
 // Verifies the invoice belongs to the signed-in customer and is payable.
@@ -25,19 +26,23 @@ export async function payInvoice(formData: FormData) {
 
   const { data: invoice } = await admin
     .from("invoices")
-    .select("id, invoice_number, customer_id, total_amount, status")
+    .select("id, invoice_number, customer_id, total_amount, credit_amount, status")
     .eq("id", id)
     .maybeSingle<{
       id: string;
       invoice_number: string;
       customer_id: string;
       total_amount: number;
+      credit_amount: number;
       status: string;
     }>();
   if (!invoice || invoice.customer_id !== customer.id) redirect("/invoices");
   if (invoice.status === "paid" || invoice.status === "canceled") {
     redirect(`/invoices/${id}`);
   }
+  // Charge the amount actually owed (total minus any admin credit).
+  const amountDue = invoiceAmountDue(invoice);
+  if (amountDue <= 0) redirect(`/invoices/${id}`); // fully credited — nothing to pay
 
   const h = await headers();
   const host = h.get("host") ?? "";
@@ -63,7 +68,7 @@ export async function payInvoice(formData: FormData) {
           quantity: 1,
           price_data: {
             currency: "usd",
-            unit_amount: Math.round(Number(invoice.total_amount) * 100),
+            unit_amount: Math.round(amountDue * 100),
             product_data: { name: `Invoice ${invoice.invoice_number}` },
           },
         },
@@ -109,14 +114,17 @@ export async function payInvoices(formData: FormData) {
     .maybeSingle<{ id: string; email: string | null }>();
   if (!customer) redirect("/invoices");
 
-  // Only this customer's own, still-payable invoices.
+  // Only this customer's own, still-payable invoices (and with a balance left
+  // after any credit).
   const { data: invoiceData } = await admin
     .from("invoices")
-    .select("id, invoice_number, total_amount")
+    .select("id, invoice_number, total_amount, credit_amount")
     .in("id", ids)
     .eq("customer_id", customer.id)
     .in("status", ["unpaid", "overdue"]);
-  const payable = invoiceData ?? [];
+  const payable = (invoiceData ?? [])
+    .map((i) => ({ ...i, amount_due: invoiceAmountDue(i) }))
+    .filter((i) => i.amount_due > 0);
   if (payable.length === 0) redirect("/invoices");
 
   const { data: batch, error: batchErr } = await admin
@@ -149,7 +157,7 @@ export async function payInvoices(formData: FormData) {
         quantity: 1,
         price_data: {
           currency: "usd",
-          unit_amount: Math.round(Number(i.total_amount) * 100),
+          unit_amount: Math.round(i.amount_due * 100),
           product_data: { name: `Invoice ${i.invoice_number}` },
         },
       })),

@@ -238,7 +238,10 @@ function drawInvoice(doc: PDFDocument, assets: Assets, input: InvoicePdfInput) {
   }
 
   // Keep the totals block together on the final page.
-  if (y - (order.delivery_fee > 0 ? 90 : 73) < CONTENT_BOTTOM) {
+  const credit = Number(invoice.credit_amount ?? 0);
+  const totalsBlockH =
+    73 + (order.delivery_fee > 0 ? 17 : 0) + (credit > 0 ? 17 : 0);
+  if (y - totalsBlockH < CONTENT_BOTTOM) {
     continuePage(false);
   }
 
@@ -265,10 +268,15 @@ function drawInvoice(doc: PDFDocument, assets: Assets, input: InvoicePdfInput) {
     totalRow("Delivery fee", formatPrice(order.delivery_fee), font, 10, MUTED);
     y -= 17;
   }
+  if (credit > 0) {
+    totalRow("Credit", `-${formatPrice(credit)}`, font, 10, MUTED);
+    y -= 17;
+  }
   y -= 4;
   rule(y);
   y -= 22;
-  totalRow("Total due", formatPrice(order.total_amount), bold, 13);
+  const amountDue = Math.max(0, round2(order.total_amount - credit));
+  totalRow("Amount due", formatPrice(amountDue), bold, 13);
 
   // --- Footer note (pinned near the bottom). ----------------------------------
   const footY = MARGIN + 24;

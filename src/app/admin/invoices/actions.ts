@@ -3,8 +3,86 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createInvoiceForOrder, markOverdueInvoices } from "@/lib/invoices";
+import {
+  createInvoiceForOrder,
+  markOverdueInvoices,
+  invoiceAmountDue,
+} from "@/lib/invoices";
+import { formatPrice } from "@/lib/format";
 import { INVOICE_STATUSES, type InvoiceStatus } from "@/lib/types";
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+export type CreditState = { error: string | null; success: string | null };
+
+// Apply an admin credit/adjustment to an unpaid invoice (shorted/damaged order,
+// pricing fix). Accumulates onto any existing credit and reduces the amount due;
+// a credit that covers the whole balance settles the invoice ("paid by credit")
+// so it stops locking the customer / showing as outstanding.
+export async function applyCredit(
+  _prev: CreditState,
+  formData: FormData,
+): Promise<CreditState> {
+  await requireAdmin();
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Missing invoice.", success: null };
+  const amount = Number(String(formData.get("amount") ?? "").replace(/[$,\s]/g, ""));
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { error: "Enter a credit amount greater than 0.", success: null };
+  }
+  if (!reason) return { error: "Add a reason for the credit.", success: null };
+
+  const admin = createAdminClient();
+  const { data: inv } = await admin
+    .from("invoices")
+    .select("total_amount, credit_amount, credit_reason, status")
+    .eq("id", id)
+    .maybeSingle<{
+      total_amount: number;
+      credit_amount: number;
+      credit_reason: string | null;
+      status: string;
+    }>();
+  if (!inv) return { error: "Invoice not found.", success: null };
+  if (inv.status === "paid" || inv.status === "canceled") {
+    return { error: `Can't credit a ${inv.status} invoice.`, success: null };
+  }
+
+  const due = invoiceAmountDue(inv);
+  if (amount > due + 0.001) {
+    return {
+      error: `Credit can't exceed the amount due (${formatPrice(due)}).`,
+      success: null,
+    };
+  }
+
+  const newCredit = round2(Number(inv.credit_amount ?? 0) + amount);
+  const newDue = invoiceAmountDue({ total_amount: inv.total_amount, credit_amount: newCredit });
+  const update: Record<string, unknown> = {
+    credit_amount: newCredit,
+    credit_reason: inv.credit_reason ? `${inv.credit_reason}; ${reason}` : reason,
+  };
+  // Full credit settles the invoice (Yero confirmed: auto-close).
+  if (newDue <= 0) {
+    update.status = "paid";
+    update.paid_at = new Date().toISOString();
+  }
+
+  const { error } = await admin.from("invoices").update(update).eq("id", id);
+  if (error) return { error: error.message, success: null };
+
+  revalidatePath(`/admin/invoices/${id}`);
+  revalidatePath("/admin/invoices");
+  return {
+    error: null,
+    success:
+      newDue <= 0
+        ? `Credited ${formatPrice(amount)} — invoice settled by credit.`
+        : `Credited ${formatPrice(amount)}. Amount due now ${formatPrice(newDue)}.`,
+  };
+}
 
 // Set an invoice's status (the admin "mark as paid" control, plus the ability to
 // revert or force overdue). paid_at is stamped when paid and cleared otherwise.

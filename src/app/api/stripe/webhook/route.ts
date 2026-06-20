@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import { getStripe, stripeWebhookSecret } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createOrderForCustomer, type PricedOrder } from "@/lib/orders";
+import { invoiceAmountDue } from "@/lib/invoices";
 import { getSettings } from "@/lib/settings";
 import { sendPaymentReceipt, sendAdminPaymentFailedAlert } from "@/lib/email";
 import { formatPrice, formatDate } from "@/lib/format";
@@ -170,7 +171,7 @@ async function markPaid(session: Stripe.Checkout.Session) {
     })
     .in("id", targetIds)
     .in("status", ["unpaid", "overdue"]) // idempotent: no double-email
-    .select("invoice_number, total_amount, customer_id");
+    .select("invoice_number, total_amount, credit_amount, customer_id");
   const paid = updated ?? [];
   if (paid.length === 0) return; // already paid / not found
 
@@ -182,7 +183,7 @@ async function markPaid(session: Stripe.Checkout.Session) {
     .eq("id", paid[0].customer_id)
     .maybeSingle<{ email: string | null }>();
   if (customer?.email) {
-    const totalPaid = paid.reduce((s, r) => s + Number(r.total_amount), 0);
+    const totalPaid = paid.reduce((s, r) => s + invoiceAmountDue(r), 0);
     const label =
       paid.length === 1
         ? `Invoice ${paid[0].invoice_number}`

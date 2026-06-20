@@ -5,6 +5,7 @@ import { CustomerHeader } from "@/components/customer-header";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
 import { FulfillmentInfo } from "@/components/fulfillment-info";
 import { formatPrice, formatDateOnly } from "@/lib/format";
+import { invoiceAmountDue } from "@/lib/invoices";
 import { payInvoice } from "../actions";
 import type { Invoice, Order, OrderItem } from "@/lib/types";
 
@@ -62,6 +63,8 @@ export default async function InvoiceDetailPage({
   ]);
   const items = (itemsData ?? []) as OrderItem[];
   const deliveryFee = order?.delivery_fee ?? 0;
+  const credit = Number(invoice.credit_amount ?? 0);
+  const amountDue = invoiceAmountDue(invoice);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -205,12 +208,32 @@ export default async function InvoiceDetailPage({
                   </td>
                 </tr>
               ) : null}
+              {credit > 0 ? (
+                <>
+                  <tr>
+                    <td colSpan={3} className="px-5 py-2 text-right text-sm text-stone-500">
+                      Order total
+                    </td>
+                    <td className="px-5 py-2 text-right text-sm text-stone-900">
+                      {formatPrice(invoice.total_amount)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colSpan={3} className="px-5 py-2 text-right text-sm text-green-700">
+                      Credit{invoice.credit_reason ? ` — ${invoice.credit_reason}` : ""}
+                    </td>
+                    <td className="px-5 py-2 text-right text-sm text-green-700">
+                      −{formatPrice(credit)}
+                    </td>
+                  </tr>
+                </>
+              ) : null}
               <tr className="border-t border-stone-200">
                 <td colSpan={3} className="px-5 py-3 text-right text-sm font-medium text-stone-700">
-                  Total due
+                  Amount due
                 </td>
                 <td className="px-5 py-3 text-right text-lg font-bold text-stone-900">
-                  {formatPrice(invoice.total_amount)}
+                  {formatPrice(amountDue)}
                 </td>
               </tr>
             </tfoot>

@@ -454,7 +454,7 @@ security invoker
 set search_path = public
 as $$
   select
-    coalesce(sum(total_amount) filter (where status in ('unpaid', 'overdue')), 0)::numeric,
+    coalesce(sum(total_amount - credit_amount) filter (where status in ('unpaid', 'overdue')), 0)::numeric,
     count(*) filter (where status = 'unpaid'),
     count(*) filter (where status = 'overdue')
   from public.invoices;
@@ -493,6 +493,10 @@ create table if not exists public.invoices (
   status         text not null default 'unpaid'
                    check (status in ('unpaid', 'paid', 'overdue')),
   total_amount   numeric(10,2) not null default 0 check (total_amount >= 0),
+  -- Admin credit/adjustment (shorted/damaged order, pricing fix). Amount owed =
+  -- total_amount − credit_amount (clamped ≥ 0); a full credit settles the invoice.
+  credit_amount  numeric(10,2) not null default 0 check (credit_amount >= 0),
+  credit_reason  text,
   -- Set when an admin marks the invoice paid; cleared if moved back to unpaid.
   paid_at        timestamptz,
   -- Internal admin note for off-platform payments (e.g. a check #). Never shown
@@ -511,6 +515,9 @@ alter table public.invoices add column if not exists payment_note text;
 -- Stripe PaymentIntent id, set when an invoice is paid online (paid_at already
 -- exists above). Reference back to the Stripe transaction.
 alter table public.invoices add column if not exists stripe_payment_id text;
+-- Admin credit/adjustment columns (no-op on fresh installs).
+alter table public.invoices add column if not exists credit_amount numeric(10,2) not null default 0 check (credit_amount >= 0);
+alter table public.invoices add column if not exists credit_reason text;
 -- Keep the invoice-level due-date fallback in step with the 7-day net terms (the
 -- app sets due_date explicitly per customer, so this only applies to a direct
 -- insert with no due_date). No-op on fresh installs — table default is already 7.
