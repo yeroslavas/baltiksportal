@@ -23,6 +23,14 @@ create table if not exists public.customers (
   notes         text,
   waive_delivery_minimum boolean not null default false,
   allow_invoicing boolean not null default false,
+  -- Auto-pay: customer authorizes ACH once (saved on a persistent Stripe
+  -- Customer), then invoices charge automatically on their due date. Only
+  -- autopay_enabled + autopay_bank_last4 are customer-readable (see grants).
+  stripe_customer_id text,
+  autopay_enabled boolean not null default false,
+  autopay_payment_method_id text,
+  autopay_bank_last4 text,
+  autopay_fail_count integer not null default 0,
   created_at    timestamptz not null default now()
 );
 
@@ -36,6 +44,12 @@ alter table public.customers add column if not exists delivery_window text;
 alter table public.customers add column if not exists waive_delivery_minimum boolean not null default false;
 -- When true, this customer may pay by invoice (vs upfront) — for the future payment flow.
 alter table public.customers add column if not exists allow_invoicing boolean not null default false;
+-- Auto-pay columns (no-op on fresh installs).
+alter table public.customers add column if not exists stripe_customer_id text;
+alter table public.customers add column if not exists autopay_enabled boolean not null default false;
+alter table public.customers add column if not exists autopay_payment_method_id text;
+alter table public.customers add column if not exists autopay_bank_last4 text;
+alter table public.customers add column if not exists autopay_fail_count integer not null default 0;
 
 -- Products: the catalog. base_price applies unless a customer override exists.
 -- name/description/unit/base_price are customer-facing; sku + the report_*/
@@ -142,7 +156,7 @@ create policy "read own pricing"
 
 -- customers: hide sales_rep, tier, notes (internal admin fields).
 revoke select on public.customers from anon, authenticated;
-grant select (id, user_id, business_name, contact_name, email, phone, address, created_at)
+grant select (id, user_id, business_name, contact_name, email, phone, address, autopay_enabled, autopay_bank_last4, created_at)
   on public.customers to anon, authenticated;
 
 -- products: hide sku, bake_time, product_type, report_* (internal/reporting).
