@@ -35,6 +35,10 @@ export async function POST(req: Request): Promise<Response> {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
+    // Auto-pay setup (mode: "setup") — save the bank + enable auto-pay.
+    if (session.metadata?.autopay_customer_id) {
+      await completeAutopaySetup(session);
+    }
     // Create the order as soon as payment is authorized (card OR ACH).
     if (session.metadata?.pending_order_id) {
       await materializePendingOrder(session);
@@ -69,6 +73,38 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   return Response.json({ received: true });
+}
+
+// Finish auto-pay setup: pull the saved bank from the SetupIntent and enable
+// auto-pay on the customer (idempotent — re-running just re-saves the same PM).
+async function completeAutopaySetup(session: Stripe.Checkout.Session) {
+  const customerId = session.metadata?.autopay_customer_id;
+  const siId =
+    typeof session.setup_intent === "string"
+      ? session.setup_intent
+      : (session.setup_intent?.id ?? null);
+  if (!customerId || !siId) return;
+
+  const stripe = getStripe();
+  const si = await stripe.setupIntents.retrieve(siId);
+  const pmId =
+    typeof si.payment_method === "string"
+      ? si.payment_method
+      : (si.payment_method?.id ?? null);
+  if (!pmId) return;
+
+  const pm = await stripe.paymentMethods.retrieve(pmId);
+  const last4 = pm.us_bank_account?.last4 ?? null;
+
+  await createAdminClient()
+    .from("customers")
+    .update({
+      autopay_enabled: true,
+      autopay_payment_method_id: pmId,
+      autopay_bank_last4: last4,
+      autopay_fail_count: 0,
+    })
+    .eq("id", customerId);
 }
 
 function paymentIntentId(session: Stripe.Checkout.Session): string | null {

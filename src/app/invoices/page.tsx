@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CustomerHeader } from "@/components/customer-header";
 import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/pagination";
 import { InvoicePayList } from "./invoice-pay-list";
+import { AutopayCard } from "@/components/autopay-card";
 import { invoiceAmountDue } from "@/lib/invoices";
 import type { Invoice } from "@/lib/types";
 
@@ -14,12 +15,20 @@ type InvoiceRow = Invoice & { orders: { order_date: string } | null };
 export default async function InvoicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; paid?: string; payerror?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    paid?: string;
+    payerror?: string;
+    autopay?: string;
+    autopayerror?: string;
+  }>;
 }) {
   const {
     page: pageParam,
     paid,
     payerror,
+    autopay,
+    autopayerror,
   } = await searchParams;
   const page = Math.max(1, Math.floor(Number(pageParam)) || 1);
 
@@ -27,9 +36,13 @@ export default async function InvoicesPage({
   const supabase = await createClient();
   const { data: customer } = await supabase
     .from("customers")
-    .select("business_name")
+    .select("business_name, autopay_enabled, autopay_bank_last4")
     .eq("user_id", user.id)
-    .maybeSingle<{ business_name: string }>();
+    .maybeSingle<{
+      business_name: string;
+      autopay_enabled: boolean;
+      autopay_bank_last4: string | null;
+    }>();
 
   // RLS limits this to the signed-in customer's own invoices.
   const from = (page - 1) * DEFAULT_PAGE_SIZE;
@@ -73,6 +86,27 @@ export default async function InvoicesPage({
             </p>
           </div>
         ) : null}
+
+        {autopay === "on" ? (
+          <div className="mt-4 rounded-2xl border border-green-200 bg-green-50 px-5 py-4 text-sm text-green-800">
+            <p className="font-semibold">Auto-pay is set up.</p>
+            <p>New invoices are charged automatically on their due date.</p>
+          </div>
+        ) : autopay === "off" ? (
+          <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 px-5 py-4 text-sm text-stone-700">
+            Auto-pay has been turned off.
+          </div>
+        ) : autopayerror ? (
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800">
+            <p className="font-semibold">Couldn&apos;t set up auto-pay.</p>
+            <p className="mt-1 break-words">{autopayerror}</p>
+          </div>
+        ) : null}
+
+        <AutopayCard
+          enabled={customer?.autopay_enabled ?? false}
+          bankLast4={customer?.autopay_bank_last4 ?? null}
+        />
 
         {total === 0 ? (
           <div className="mt-8 rounded-2xl border border-dashed border-stone-300 bg-white p-10 text-center text-stone-500">
