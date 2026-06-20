@@ -3,6 +3,7 @@ import { getStripe, stripeWebhookSecret } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createOrderForCustomer, type PricedOrder } from "@/lib/orders";
 import { invoiceAmountDue } from "@/lib/invoices";
+import { recordAutopaySuccess, recordAutopayFailure } from "@/lib/autopay";
 import { getSettings } from "@/lib/settings";
 import { sendPaymentReceipt, sendAdminPaymentFailedAlert } from "@/lib/email";
 import { formatPrice, formatDate } from "@/lib/format";
@@ -69,6 +70,23 @@ export async function POST(req: Request): Promise<Response> {
         .from("pending_orders")
         .delete()
         .eq("id", pendingId);
+    }
+  } else if (event.type === "payment_intent.succeeded") {
+    // Off-session AUTO-PAY charge settled. Scoped to autopay metadata so the
+    // PaymentIntents behind Checkout flows (handled above) are ignored here.
+    const pi = event.data.object as Stripe.PaymentIntent;
+    if (pi.metadata?.autopay_invoice_id) {
+      await recordAutopaySuccess(pi.metadata.autopay_invoice_id, pi.id);
+    }
+  } else if (event.type === "payment_intent.payment_failed") {
+    const pi = event.data.object as Stripe.PaymentIntent;
+    if (pi.metadata?.autopay_invoice_id && pi.metadata?.autopay_customer_id) {
+      const reason = pi.last_payment_error?.message ?? "ACH debit failed";
+      await recordAutopayFailure(
+        pi.metadata.autopay_customer_id,
+        pi.metadata.autopay_invoice_id,
+        reason,
+      );
     }
   }
 
