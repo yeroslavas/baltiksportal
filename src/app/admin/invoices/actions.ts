@@ -125,6 +125,9 @@ export async function setInvoiceStatus(formData: FormData) {
     .update({
       status,
       paid_at: status === "paid" ? new Date().toISOString() : null,
+      // Reverting off "paid" clears the Stripe tag, so the invoice isn't mistaken
+      // for a payment-in-flight (which would skip the credit stop).
+      ...(status !== "paid" ? { stripe_payment_id: null } : {}),
     })
     .eq("id", id);
 
