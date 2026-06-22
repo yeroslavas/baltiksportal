@@ -114,6 +114,10 @@ export async function getOverdueInvoices(
     .select("id, invoice_number, total_amount, due_date")
     .eq("customer_id", customerId)
     .or(`status.eq.overdue,and(status.eq.unpaid,due_date.lt.${today})`)
+    // A payment in flight (ACH authorized but not yet settled — stripe_payment_id
+    // is set while the invoice is still unpaid/overdue) lifts the credit stop on
+    // authorization. If the ACH later fails, the webhook clears the tag → re-locks.
+    .is("stripe_payment_id", null)
     .order("due_date");
   return data ?? [];
 }

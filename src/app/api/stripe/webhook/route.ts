@@ -44,6 +44,12 @@ export async function POST(req: Request): Promise<Response> {
     if (session.metadata?.pending_order_id) {
       await materializePendingOrder(session);
     }
+    // Pay-an-invoice (single or batch): tag the invoice(s) as payment-in-flight
+    // on authorization so a credit-stopped customer is unblocked immediately
+    // (the ACH may still be settling). A later failure clears the tag → re-locks.
+    if (session.metadata?.invoice_id || session.metadata?.batch_id) {
+      await tagInvoicesInFlight(session);
+    }
     // Card payments are settled at this point — mark paid now.
     if (session.payment_status === "paid") {
       await markPaid(session);
@@ -279,8 +285,25 @@ async function invoiceIdsForSession(
   return [];
 }
 
+// Tag a pay-an-invoice session's invoice(s) as payment-in-flight (sets
+// stripe_payment_id while still unpaid/overdue), which lifts the credit stop on
+// authorization. Cleared again by flagPaymentFailed if the ACH fails.
+async function tagInvoicesInFlight(session: Stripe.Checkout.Session) {
+  const pi = paymentIntentId(session);
+  if (!pi) return;
+  const admin = createAdminClient();
+  const ids = await invoiceIdsForSession(admin, session);
+  if (ids.length === 0) return;
+  await admin
+    .from("invoices")
+    .update({ stripe_payment_id: pi })
+    .in("id", ids)
+    .in("status", ["unpaid", "overdue"]);
+}
+
 // ACH failed/returned: flag the still-unpaid invoice(s) with a note (don't
-// cancel — the order may already be in production) and alert the admin.
+// cancel — the order may already be in production), clear the in-flight tag so
+// the credit stop re-applies, and alert the admin.
 async function flagPaymentFailed(session: Stripe.Checkout.Session) {
   const admin = createAdminClient();
   const targetIds = await invoiceIdsForSession(admin, session);
@@ -289,7 +312,7 @@ async function flagPaymentFailed(session: Stripe.Checkout.Session) {
   const note = `⚠ ACH payment failed/returned ${formatDate(new Date().toISOString())} — follow up`;
   const { data: flagged } = await admin
     .from("invoices")
-    .update({ payment_note: note })
+    .update({ payment_note: note, stripe_payment_id: null }) // clear in-flight → re-lock
     .in("id", targetIds)
     .in("status", ["unpaid", "overdue"]) // don't touch already-paid/canceled
     .select("invoice_number, total_amount, customer_id");
