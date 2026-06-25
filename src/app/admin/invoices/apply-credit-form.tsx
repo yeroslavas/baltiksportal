@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { applyCredit, type CreditState } from "./actions";
+import { submitOnEnter } from "@/lib/submit-on-enter";
 
 const initial: CreditState = { error: null, success: null };
 
@@ -25,7 +26,7 @@ export function ApplyCreditForm({
   }, [state.success]);
 
   return (
-    <form ref={formRef} action={action} className="space-y-3">
+    <form ref={formRef} action={action} onKeyDown={submitOnEnter} className="space-y-3">
       <input type="hidden" name="id" value={id} />
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5">

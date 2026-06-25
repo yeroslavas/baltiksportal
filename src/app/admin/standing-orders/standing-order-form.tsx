@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { submitOnEnter } from "@/lib/submit-on-enter";
 import type { ActionState } from "./actions";
 
 const initialState: ActionState = { error: null, success: null };
@@ -50,7 +51,7 @@ export function StandingOrderForm({
   const [skips, setSkips] = useState<string[]>(initial?.skipDates ?? []);
 
   return (
-    <form action={formAction} className="space-y-8">
+    <form action={formAction} onKeyDown={submitOnEnter} className="space-y-8">
       {mode === "edit" && initial ? (
         <input type="hidden" name="id" value={initial.id} />
       ) : null}

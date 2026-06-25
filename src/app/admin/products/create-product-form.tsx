@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { createProduct, type ActionState } from "./actions";
+import { submitOnEnter } from "@/lib/submit-on-enter";
 
 const initialState: ActionState = { error: null, success: null };
 
@@ -40,6 +41,7 @@ export function CreateProductForm({
     <form
       ref={formRef}
       action={formAction}
+      onKeyDown={submitOnEnter}
       className="grid grid-cols-1 gap-4 sm:grid-cols-2"
     >
       <div className="flex flex-col gap-1.5">

@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import { createCustomer, type ActionState } from "./actions";
 import { PhoneInput } from "@/components/phone-input";
+import { submitOnEnter } from "@/lib/submit-on-enter";
 
 const initialState: ActionState = { error: null, success: null };
 
@@ -25,6 +26,7 @@ export function CreateCustomerForm() {
     <form
       ref={formRef}
       action={formAction}
+      onKeyDown={submitOnEnter}
       className="grid grid-cols-1 gap-4 sm:grid-cols-2"
     >
       <div className="flex flex-col gap-1.5 sm:col-span-2">
