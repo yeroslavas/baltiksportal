@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { savePricing, type ActionState } from "./actions";
 import { formatPrice } from "@/lib/format";
+import { submitOnEnter } from "@/lib/submit-on-enter";
 import type { Product } from "@/lib/types";
 
 const initialState: ActionState = { error: null, success: null };
@@ -22,7 +23,7 @@ export function PricingEditor({
   );
 
   return (
-    <form action={formAction}>
+    <form action={formAction} onKeyDown={submitOnEnter}>
       <input type="hidden" name="customer_id" value={customerId} />
 
       <div className="overflow-x-auto">

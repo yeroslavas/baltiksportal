@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { resetCustomerPassword, type ActionState } from "./actions";
+import { submitOnEnter } from "@/lib/submit-on-enter";
 
 const initialState: ActionState = { error: null, success: null };
 
@@ -39,7 +40,7 @@ export function ResetPasswordForm({ userId }: { userId: string }) {
   }
 
   return (
-    <form action={formAction} className="flex w-72 flex-col items-end gap-2">
+    <form action={formAction} onKeyDown={submitOnEnter} className="flex w-72 flex-col items-end gap-2">
       <input type="hidden" name="user_id" value={userId} />
       <div className="flex w-full items-center gap-2">
         <input

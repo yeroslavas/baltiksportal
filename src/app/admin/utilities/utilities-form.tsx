@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { updateSettings, type SettingsState } from "./actions";
 import { formatCutoffHour } from "@/lib/order-cutoff";
+import { submitOnEnter } from "@/lib/submit-on-enter";
 import type { AppSettings } from "@/lib/settings";
 
 const initialState: SettingsState = { error: null, success: null };
@@ -30,7 +31,7 @@ export function UtilitiesForm({ settings }: { settings: AppSettings }) {
   );
 
   return (
-    <form action={formAction} className="space-y-8">
+    <form action={formAction} onKeyDown={submitOnEnter} className="space-y-8">
       <section className="space-y-4">
         <div>
           <h2 className="font-semibold text-stone-900">Delivery pricing</h2>

@@ -3,6 +3,7 @@
 import { useActionState, useState, type ChangeEvent } from "react";
 import Image from "next/image";
 import { updateProduct, type ActionState } from "../../actions";
+import { submitOnEnter } from "@/lib/submit-on-enter";
 import type { Product } from "@/lib/types";
 
 const initialState: ActionState = { error: null, success: null };
@@ -38,6 +39,7 @@ export function EditProductForm({
   return (
     <form
       action={formAction}
+      onKeyDown={submitOnEnter}
       className="grid grid-cols-1 gap-4 sm:grid-cols-2"
     >
       <input type="hidden" name="id" value={product.id} />

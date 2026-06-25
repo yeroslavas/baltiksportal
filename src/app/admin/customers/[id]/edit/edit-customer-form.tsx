@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { updateCustomer, type ActionState } from "../../actions";
 import { PhoneInput } from "@/components/phone-input";
+import { submitOnEnter } from "@/lib/submit-on-enter";
 import type { Customer } from "@/lib/types";
 
 const initialState: ActionState = { error: null, success: null };
@@ -25,6 +26,7 @@ export function EditCustomerForm({
   return (
     <form
       action={formAction}
+      onKeyDown={submitOnEnter}
       className="grid grid-cols-1 gap-4 sm:grid-cols-2"
     >
       <input type="hidden" name="id" value={customer.id} />
