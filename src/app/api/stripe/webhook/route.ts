@@ -93,6 +93,13 @@ export async function POST(req: Request): Promise<Response> {
         pi.metadata.autopay_invoice_id,
         reason,
       );
+    } else {
+      // A non-auto-pay Checkout invoice/batch payment failed. checkout.session.
+      // async_payment_failed usually covers this, but that event can be missed or
+      // not fire for every decline path — so also clear the in-flight tag on any
+      // invoice tagged with this PaymentIntent, so it can't get stuck showing
+      // "Payment Processing" (which would wrongly keep the credit stop lifted).
+      await clearInFlightForPaymentIntent(pi);
     }
   }
 
@@ -333,4 +340,25 @@ async function flagPaymentFailed(session: Stripe.Checkout.Session) {
     amountDisplay: formatPrice(totalFailed),
     businessName: settings.businessName,
   });
+}
+
+// Belt-and-suspenders for payment_intent.payment_failed on a non-auto-pay Checkout
+// payment: clear the in-flight tag on any still-owing invoice carrying this PI, so
+// a failed ACH can't leave it stuck on "Payment Processing" (which would keep the
+// credit stop lifted). Idempotent — a no-op if async_payment_failed already ran.
+// No admin email here: async_payment_failed owns that alert to avoid duplicates.
+async function clearInFlightForPaymentIntent(pi: Stripe.PaymentIntent) {
+  const reason = pi.last_payment_error?.message ?? "ACH debit failed";
+  await createAdminClient()
+    .from("invoices")
+    .update({
+      stripe_payment_id: null,
+      payment_note:
+        `⚠ ACH payment failed/returned ${formatDate(new Date().toISOString())} — ${reason}`.slice(
+          0,
+          480,
+        ),
+    })
+    .eq("stripe_payment_id", pi.id)
+    .in("status", ["unpaid", "overdue"]);
 }

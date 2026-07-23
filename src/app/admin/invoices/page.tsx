@@ -5,10 +5,10 @@ import { formatPrice, formatDateOnly } from "@/lib/format";
 import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/pagination";
 import { SortableHeader, type SortDir } from "@/components/sortable-header";
 import { businessToday } from "@/lib/standing-orders";
-import { InvoiceStatusForm } from "./invoice-status-form";
 import { RecomputeOverdueButton } from "./recompute-overdue-button";
+import { ReconcileButton } from "./reconcile-button";
 import { RunAutopayButton } from "./run-autopay-button";
-import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
+import { InvoiceDisplayBadge } from "@/components/invoice-display-badge";
 import type { Invoice } from "@/lib/types";
 
 type EnrolledCustomer = {
@@ -196,6 +196,17 @@ export default async function AdminInvoicesPage({
         <RecomputeOverdueButton />
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-xl text-sm text-stone-500">
+          Reconcile payments checks every invoice showing{" "}
+          <span className="font-medium text-blue-700">Payment Processing</span>{" "}
+          against Stripe — settling any that cleared and clearing any that were
+          declined or returned (which re-locks the account). Runs automatically,
+          but you can force it here.
+        </p>
+        <ReconcileButton />
+      </div>
+
       <section className="rounded-2xl border border-stone-200 bg-white shadow-sm">
         <h2 className="border-b border-stone-200 px-6 py-4 font-semibold text-stone-900">
           All invoices ({total})
@@ -251,11 +262,7 @@ export default async function AdminInvoicesPage({
                       {formatPrice(inv.total_amount)}
                     </td>
                     <td className="px-6 py-3">
-                      {inv.status === "canceled" ? (
-                        <InvoiceStatusBadge status={inv.status} />
-                      ) : (
-                        <InvoiceStatusForm id={inv.id} status={inv.status} />
-                      )}
+                      <InvoiceDisplayBadge inv={inv} />
                     </td>
                     <td className="px-6 py-3 text-right">
                       <Link
