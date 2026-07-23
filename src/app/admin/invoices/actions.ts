@@ -9,6 +9,7 @@ import {
   invoiceAmountDue,
 } from "@/lib/invoices";
 import { runAutopayCharges } from "@/lib/autopay-run";
+import { reconcilePaymentsInFlight } from "@/lib/reconcile";
 import { formatPrice } from "@/lib/format";
 import { INVOICE_STATUSES, type InvoiceStatus } from "@/lib/types";
 
@@ -33,6 +34,34 @@ export async function runAutopayNow(
   if (s.failed) extra.push(`${s.failed} failed`);
   return {
     message: extra.length ? `${base} (${extra.join(", ")})` : base,
+    error: s.errors.length ? s.errors.slice(0, 3).join("; ") : null,
+  };
+}
+
+export type ReconcileState = { message: string | null; error: string | null };
+
+// Reconcile every payment "in flight" against Stripe's actual PaymentIntent
+// status (manual trigger for the reconcile cron). Fixes invoices whose in-flight
+// tag got stuck — marks cleared ACH paid, clears declined/returned ones (which
+// re-applies the credit stop). Idempotent.
+export async function reconcilePaymentsNow(
+  _prev: ReconcileState,
+  _formData: FormData,
+): Promise<ReconcileState> {
+  await requireAdmin();
+  const s = await reconcilePaymentsInFlight();
+  revalidatePath("/admin/invoices");
+
+  if (s.checked === 0) {
+    return { message: "No payments in flight to reconcile.", error: null };
+  }
+  const parts: string[] = [];
+  if (s.markedPaid) parts.push(`${s.markedPaid} marked paid`);
+  if (s.markedFailed) parts.push(`${s.markedFailed} cleared (failed)`);
+  if (s.stillProcessing) parts.push(`${s.stillProcessing} still processing`);
+  const base = `Checked ${s.checked} in-flight payment${s.checked === 1 ? "" : "s"}`;
+  return {
+    message: parts.length ? `${base}: ${parts.join(", ")}.` : `${base}.`,
     error: s.errors.length ? s.errors.slice(0, 3).join("; ") : null,
   };
 }
