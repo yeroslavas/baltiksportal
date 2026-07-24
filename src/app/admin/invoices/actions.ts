@@ -57,7 +57,8 @@ export async function reconcilePaymentsNow(
   }
   const parts: string[] = [];
   if (s.markedPaid) parts.push(`${s.markedPaid} marked paid`);
-  if (s.markedFailed) parts.push(`${s.markedFailed} cleared (failed)`);
+  if (s.markedFailed) parts.push(`${s.markedFailed} declined`);
+  if (s.markedIncomplete) parts.push(`${s.markedIncomplete} incomplete`);
   if (s.stillProcessing) parts.push(`${s.stillProcessing} still processing`);
   const base = `Checked ${s.checked} in-flight payment${s.checked === 1 ? "" : "s"}`;
   return {
