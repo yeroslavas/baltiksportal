@@ -20,6 +20,7 @@ export type ReconcileSummary = {
   checked: number;
   markedPaid: number;
   markedFailed: number;
+  markedIncomplete: number;
   stillProcessing: number;
   errors: string[];
 };
@@ -31,6 +32,7 @@ export async function reconcilePaymentsInFlight(): Promise<ReconcileSummary> {
     checked: 0,
     markedPaid: 0,
     markedFailed: 0,
+    markedIncomplete: 0,
     stillProcessing: 0,
     errors: [],
   };
@@ -66,6 +68,7 @@ export async function reconcilePaymentsInFlight(): Promise<ReconcileSummary> {
       continue;
     }
 
+    const now = formatDate(new Date().toISOString());
     if (pi.status === "succeeded") {
       // ACH cleared — the success webhook was missed; settle it now. (No receipt
       // email here; only the webhook path sends those.)
@@ -77,20 +80,23 @@ export async function reconcilePaymentsInFlight(): Promise<ReconcileSummary> {
         .in("status", ["unpaid", "overdue"])
         .select("id");
       if (updated?.length) summary.markedPaid++;
+    } else if (pi.status === "processing") {
+      // Genuinely clearing (e.g. instant-verified ACH). Leave it in flight.
+      summary.stillProcessing++;
     } else if (
-      pi.status === "canceled" ||
-      pi.status === "requires_payment_method"
+      pi.status === "requires_action" ||
+      pi.status === "requires_confirmation"
     ) {
-      // ACH declined/returned: a confirmed PI reverts to requires_payment_method
-      // on failure (or is canceled). Clear the stuck tag so it stops reading
-      // "processing" and the credit stop re-applies; note it for follow-up.
-      const reason = pi.last_payment_error?.message ?? "payment failed/returned";
+      // Started but never completed — e.g. ACH micro-deposit verification that
+      // the customer hasn't finished (Stripe shows "Incomplete"). It isn't
+      // clearing and will expire. Clear the stuck tag (so it stops reading
+      // "processing" and the credit stop re-applies) and mark it Incomplete (⏳).
       const { data: updated } = await admin
         .from("invoices")
         .update({
           stripe_payment_id: null,
           payment_note:
-            `⚠ ACH payment failed/returned ${formatDate(new Date().toISOString())} — ${reason}`.slice(
+            `⏳ ACH payment not completed ${now} — bank verification pending; will expire if unfinished`.slice(
               0,
               480,
             ),
@@ -99,10 +105,23 @@ export async function reconcilePaymentsInFlight(): Promise<ReconcileSummary> {
         .eq("stripe_payment_id", inv.stripe_payment_id)
         .in("status", ["unpaid", "overdue"])
         .select("id");
-      if (updated?.length) summary.markedFailed++;
+      if (updated?.length) summary.markedIncomplete++;
     } else {
-      // processing / requires_action (micro-deposit) / etc — still in flight.
-      summary.stillProcessing++;
+      // canceled / requires_payment_method → hard-failed / returned / expired.
+      // Clear the tag (re-applies the credit stop); flag it Declined (⚠).
+      const reason = pi.last_payment_error?.message ?? "payment failed/returned";
+      const { data: updated } = await admin
+        .from("invoices")
+        .update({
+          stripe_payment_id: null,
+          payment_note:
+            `⚠ ACH payment failed/returned ${now} — ${reason}`.slice(0, 480),
+        })
+        .eq("id", inv.id)
+        .eq("stripe_payment_id", inv.stripe_payment_id)
+        .in("status", ["unpaid", "overdue"])
+        .select("id");
+      if (updated?.length) summary.markedFailed++;
     }
   }
 

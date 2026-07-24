@@ -49,6 +49,7 @@ const FILTER_TABS = [
   { key: "overdue", label: "Overdue" },
   { key: "processing", label: "Processing" },
   { key: "declined", label: "Declined" },
+  { key: "incomplete", label: "Incomplete" },
   { key: "paid", label: "Paid" },
 ] as const;
 const FILTER_KEYS: string[] = FILTER_TABS.map((t) => t.key);
@@ -129,7 +130,9 @@ export default async function AdminInvoicesPage({
       dataQuery = dataQuery
         .eq("status", "overdue")
         .is("stripe_payment_id", null)
-        .or("payment_note.is.null,payment_note.not.ilike.⚠*");
+        .or(
+          "payment_note.is.null,and(payment_note.not.ilike.⚠*,payment_note.not.ilike.⏳*)",
+        );
       break;
     case "processing":
       dataQuery = dataQuery
@@ -141,6 +144,12 @@ export default async function AdminInvoicesPage({
         .in("status", ["unpaid", "overdue"])
         .is("stripe_payment_id", null)
         .ilike("payment_note", "⚠%");
+      break;
+    case "incomplete":
+      dataQuery = dataQuery
+        .in("status", ["unpaid", "overdue"])
+        .is("stripe_payment_id", null)
+        .ilike("payment_note", "⏳%");
       break;
     case "paid":
       dataQuery = dataQuery.eq("status", "paid");
@@ -163,7 +172,9 @@ export default async function AdminInvoicesPage({
         cq = cq
           .eq("status", "overdue")
           .is("stripe_payment_id", null)
-          .or("payment_note.is.null,payment_note.not.ilike.⚠*");
+          .or(
+            "payment_note.is.null,and(payment_note.not.ilike.⚠*,payment_note.not.ilike.⏳*)",
+          );
         break;
       case "processing":
         cq = cq
@@ -175,6 +186,12 @@ export default async function AdminInvoicesPage({
           .in("status", ["unpaid", "overdue"])
           .is("stripe_payment_id", null)
           .ilike("payment_note", "⚠%");
+        break;
+      case "incomplete":
+        cq = cq
+          .in("status", ["unpaid", "overdue"])
+          .is("stripe_payment_id", null)
+          .ilike("payment_note", "⏳%");
         break;
       case "paid":
         cq = cq.eq("status", "paid");
