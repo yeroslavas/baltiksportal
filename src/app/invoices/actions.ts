@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
+import { getOrCreateStripeCustomer } from "@/lib/autopay";
 import { invoiceAmountDue } from "@/lib/invoices";
 
 // Create a hosted Stripe Checkout session for an invoice and redirect to it.
@@ -19,9 +20,9 @@ export async function payInvoice(formData: FormData) {
   // Trust anchor: resolve THIS user's customer record.
   const { data: customer } = await admin
     .from("customers")
-    .select("id, email")
+    .select("id, email, business_name")
     .eq("user_id", user.id)
-    .maybeSingle<{ id: string; email: string | null }>();
+    .maybeSingle<{ id: string; email: string | null; business_name: string }>();
   if (!customer) redirect("/invoices");
 
   const { data: invoice } = await admin
@@ -55,14 +56,18 @@ export async function payInvoice(formData: FormData) {
   let checkoutUrl: string | null = null;
   let payError: string | null = null;
   try {
+    // ONE persistent Stripe customer per portal customer (same as auto-pay), so
+    // the bank they connect is SAVED and offered one-click next time — instead
+    // of re-connecting + re-verifying (micro-deposits) on every payment.
+    const stripeCustomerId = await getOrCreateStripeCustomer({
+      customerId: customer.id,
+      email: customer.email,
+      businessName: customer.business_name,
+    });
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",
-      // ACH first (preferred), then card.
-      // ACH only — cards disabled to avoid card processing fees.
       payment_method_types: ["us_bank_account"],
-      // ACH debits need a Customer to hold the mandate.
-      customer_creation: "always",
-      customer_email: customer.email ?? undefined,
+      customer: stripeCustomerId,
       line_items: [
         {
           quantity: 1,
@@ -82,6 +87,8 @@ export async function payInvoice(formData: FormData) {
           invoice_id: invoice.id,
           invoice_number: invoice.invoice_number,
         },
+        // Save the bank + mandate so it's reusable (no re-verification next time).
+        setup_future_usage: "on_session",
       },
       success_url: `${origin}/invoices/${id}?paid=1`,
       cancel_url: `${origin}/invoices/${id}`,
@@ -109,9 +116,9 @@ export async function payInvoices(formData: FormData) {
   const admin = createAdminClient();
   const { data: customer } = await admin
     .from("customers")
-    .select("id, email")
+    .select("id, email, business_name")
     .eq("user_id", user.id)
-    .maybeSingle<{ id: string; email: string | null }>();
+    .maybeSingle<{ id: string; email: string | null; business_name: string }>();
   if (!customer) redirect("/invoices");
 
   // Only this customer's own, still-payable invoices (and with a balance left
@@ -147,12 +154,15 @@ export async function payInvoices(formData: FormData) {
   let checkoutUrl: string | null = null;
   let payError: string | null = null;
   try {
+    const stripeCustomerId = await getOrCreateStripeCustomer({
+      customerId: customer.id,
+      email: customer.email,
+      businessName: customer.business_name,
+    });
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",
-      // ACH only — cards disabled to avoid card processing fees.
       payment_method_types: ["us_bank_account"],
-      customer_creation: "always",
-      customer_email: customer.email ?? undefined,
+      customer: stripeCustomerId,
       line_items: payable.map((i) => ({
         quantity: 1,
         price_data: {
@@ -162,7 +172,11 @@ export async function payInvoices(formData: FormData) {
         },
       })),
       metadata: { batch_id: batch.id },
-      payment_intent_data: { metadata: { batch_id: batch.id } },
+      payment_intent_data: {
+        metadata: { batch_id: batch.id },
+        // Save the bank + mandate so it's reusable (no re-verification next time).
+        setup_future_usage: "on_session",
+      },
       success_url: `${origin}/invoices?paid=1`,
       cancel_url: `${origin}/invoices`,
     });
