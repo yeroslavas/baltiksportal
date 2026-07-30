@@ -99,20 +99,32 @@ const LABELS: Record<InvoiceDisplayState, string> = {
 // changed from the invoice detail page, not here.
 export function InvoiceDisplayBadge({
   inv,
+  variant = "admin",
 }: {
   inv: {
     status: InvoiceStatus;
     stripe_payment_id: string | null;
     payment_note: string | null;
   };
+  // "admin" tooltips expose the raw payment_note (internal follow-up detail);
+  // "customer" uses friendly generic copy so the internal note never leaks.
+  variant?: "admin" | "customer";
 }) {
   const state = invoiceDisplayState(inv);
-  const title =
-    state === "processing"
-      ? "ACH payment authorized — clearing (usually a few business days)"
-      : state === "declined" || state === "incomplete"
-        ? (inv.payment_note ?? undefined) // the Stripe reason / status detail
-        : undefined;
+  let title: string | undefined;
+  if (state === "processing") {
+    title = "Payment authorized — clearing (usually a few business days)";
+  } else if (state === "declined") {
+    title =
+      variant === "customer"
+        ? "This payment didn't go through — please try again."
+        : (inv.payment_note ?? undefined);
+  } else if (state === "incomplete") {
+    title =
+      variant === "customer"
+        ? "Payment was started but not completed — please finish it or try again."
+        : (inv.payment_note ?? undefined);
+  }
   return (
     <span
       title={title}
