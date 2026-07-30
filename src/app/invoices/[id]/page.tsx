@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireUser, isAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { CustomerHeader } from "@/components/customer-header";
-import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
+import { InvoiceDisplayBadge } from "@/components/invoice-display-badge";
 import { FulfillmentInfo } from "@/components/fulfillment-info";
 import { formatPrice, formatDateOnly } from "@/lib/format";
 import { invoiceAmountDue } from "@/lib/invoices";
@@ -99,7 +99,7 @@ export default async function InvoiceDetailPage({
             Invoice {invoice.invoice_number}
           </h1>
           <div className="flex items-center gap-3">
-            <InvoiceStatusBadge status={invoice.status} />
+            <InvoiceDisplayBadge inv={invoice} variant="customer" />
             {invoice.status === "unpaid" || invoice.status === "overdue" ? (
               <form action={payInvoice}>
                 <input type="hidden" name="invoice_id" value={invoice.id} />

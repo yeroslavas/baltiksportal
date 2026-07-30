@@ -121,6 +121,8 @@ export default async function InvoicesPage({
                 total_amount: Number(inv.total_amount),
                 amount_due: invoiceAmountDue(inv),
                 status: inv.status,
+                stripe_payment_id: inv.stripe_payment_id,
+                payment_note: inv.payment_note,
                 due_date: inv.due_date,
                 order_date: inv.orders?.order_date ?? null,
               }))}

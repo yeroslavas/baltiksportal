@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
+import { InvoiceDisplayBadge } from "@/components/invoice-display-badge";
 import { formatPrice, formatDate, formatDateOnly } from "@/lib/format";
 import { payInvoices } from "./actions";
 import type { InvoiceStatus } from "@/lib/types";
@@ -13,6 +13,9 @@ export type InvoiceListItem = {
   total_amount: number;
   amount_due: number; // total minus any admin credit
   status: InvoiceStatus;
+  // For the derived badge state (processing / declined / incomplete).
+  stripe_payment_id: string | null;
+  payment_note: string | null;
   due_date: string;
   order_date: string | null;
 };
@@ -75,7 +78,7 @@ export function InvoicePayList({
                   </p>
                 </div>
                 <div className="flex items-center gap-4">
-                  <InvoiceStatusBadge status={inv.status} />
+                  <InvoiceDisplayBadge inv={inv} variant="customer" />
                   <span className="w-24 text-right">
                     <span className="block font-semibold text-stone-900">
                       {formatPrice(inv.amount_due)}
