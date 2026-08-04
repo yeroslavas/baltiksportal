@@ -63,6 +63,132 @@ export async function createCustomer(
   return { error: null, success: `Created account for ${businessName}.` };
 }
 
+// Duplicate an existing customer: create a NEW login (new email + temp password)
+// that inherits the source's account config (tier, delivery window, payment
+// terms, invoicing flags, sales rep) AND its custom pricing. Identity fields
+// (name, contact, phone, address) are entered fresh. The source is untouched.
+export async function duplicateCustomer(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const get = (k: string) => String(formData.get(k) ?? "").trim();
+  const sourceId = get("source_id");
+  const email = get("email").toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  const businessName = get("business_name");
+
+  if (!sourceId) return { error: "Missing source customer.", success: null };
+  if (!email || !password || !businessName) {
+    return {
+      error: "Business name, login email, and temp password are required.",
+      success: null,
+    };
+  }
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters.", success: null };
+  }
+
+  const admin = createAdminClient();
+
+  // Load the source's account config to inherit.
+  const { data: src } = await admin
+    .from("customers")
+    .select(
+      "delivery_window, sales_rep, tier, waive_delivery_minimum, allow_invoicing, invoice_terms_days",
+    )
+    .eq("id", sourceId)
+    .maybeSingle<{
+      delivery_window: string | null;
+      sales_rep: string | null;
+      tier: string | null;
+      waive_delivery_minimum: boolean;
+      allow_invoicing: boolean;
+      invoice_terms_days: number;
+    }>();
+  if (!src) return { error: "Source customer not found.", success: null };
+
+  // 1) New auth user.
+  const { data: created, error: authError } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+  if (authError || !created.user) {
+    const dup = /already|registered|exists|duplicate/i.test(
+      authError?.message ?? "",
+    );
+    return {
+      error: dup
+        ? "That email is already used by another login."
+        : (authError?.message ?? "Could not create the auth user."),
+      success: null,
+    };
+  }
+
+  // 2) New customer profile inheriting the source's config.
+  const { data: newCust, error: insertError } = await admin
+    .from("customers")
+    .insert({
+      user_id: created.user.id,
+      business_name: businessName,
+      contact_name: get("contact_name") || null,
+      email,
+      phone: get("phone") || null,
+      address: get("address") || null,
+      delivery_window: src.delivery_window,
+      sales_rep: src.sales_rep,
+      tier: src.tier,
+      waive_delivery_minimum: src.waive_delivery_minimum,
+      allow_invoicing: src.allow_invoicing,
+      invoice_terms_days: src.invoice_terms_days,
+    })
+    .select("id")
+    .single();
+  if (insertError || !newCust) {
+    // Roll back the orphan login so it can't sign in with no profile.
+    await admin.auth.admin.deleteUser(created.user.id);
+    return {
+      error: insertError?.message ?? "Could not create the customer.",
+      success: null,
+    };
+  }
+
+  // 3) Copy the source's custom pricing to the new customer.
+  const { data: pricing } = await admin
+    .from("customer_pricing")
+    .select("product_id, custom_price")
+    .eq("customer_id", sourceId);
+  let copied = 0;
+  if (pricing && pricing.length > 0) {
+    const { error: priceErr } = await admin.from("customer_pricing").insert(
+      pricing.map((p) => ({
+        customer_id: newCust.id,
+        product_id: p.product_id,
+        custom_price: p.custom_price,
+      })),
+    );
+    // The customer already exists; if pricing copy fails, keep it and tell the
+    // admin to set pricing manually rather than rolling everything back.
+    if (priceErr) {
+      revalidatePath("/admin/customers");
+      return {
+        error: null,
+        success: `Created ${businessName}, but copying pricing failed (${priceErr.message}). Set its pricing manually.`,
+      };
+    }
+    copied = pricing.length;
+  }
+
+  revalidatePath("/admin/customers");
+  revalidatePath("/admin");
+  return {
+    error: null,
+    success: `Created ${businessName} with ${copied} custom price${copied === 1 ? "" : "s"} copied from the source.`,
+  };
+}
+
 export async function updateCustomer(
   _prevState: ActionState,
   formData: FormData,
