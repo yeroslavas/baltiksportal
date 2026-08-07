@@ -9,7 +9,13 @@ import { createInvoiceForOrder } from "@/lib/invoices";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-export type OrderLine = { productId: string; quantity: number };
+export type OrderLine = {
+  productId: string;
+  quantity: number;
+  // Customer asked for this (sliceable) item sliced — adds the customer's
+  // per-dozen slice_fee. Ignored for products that aren't allow_slicing.
+  sliced?: boolean;
+};
 
 export type CreateOrderResult =
   | { orderId: string; orderNumber: number; error?: undefined }
@@ -21,6 +27,7 @@ type PricedItem = {
   quantity: number;
   unit_price: number;
   line_total: number;
+  sliced: boolean;
 };
 
 export type PricedOrder = {
@@ -32,6 +39,9 @@ export type PricedOrder = {
   items: PricedItem[];
   subtotal: number;
   deliveryFee: number;
+  // Total slicing charge (per-dozen slice_fee × sliced quantity). Order-level,
+  // like deliveryFee.
+  sliceFee: number;
   total: number;
 };
 
@@ -49,14 +59,21 @@ export async function priceOrder(opts: {
 
   const { data: customer } = await admin
     .from("customers")
-    .select("id, waive_delivery_minimum, delivery_window")
+    .select("id, waive_delivery_minimum, delivery_window, slice_fee")
     .eq("id", customerId)
     .maybeSingle<{
       id: string;
       waive_delivery_minimum: boolean;
       delivery_window: string | null;
+      slice_fee: number;
     }>();
   if (!customer) return { error: "Customer not found." };
+
+  // Which products the customer asked sliced (products are aggregated by id).
+  const slicedByProduct = new Map<string, boolean>();
+  for (const line of opts.lines) {
+    if (line.sliced) slicedByProduct.set(line.productId, true);
+  }
 
   // Collect raw quantities; collect product ids. Snapping to each product's
   // allowed increment (0.5 for half-dozen items, whole otherwise) happens below,
@@ -79,7 +96,7 @@ export async function priceOrder(opts: {
   const [{ data: products }, { data: pricing }] = await Promise.all([
     admin
       .from("products")
-      .select("id, name, base_price, is_active, allow_half_dozen")
+      .select("id, name, base_price, is_active, allow_half_dozen, allow_slicing")
       .in("id", productIds),
     admin
       .from("customer_pricing")
@@ -114,12 +131,16 @@ export async function priceOrder(opts: {
     const unitPrice = round2(
       overrides.get(productId) ?? Number(product.base_price),
     );
+    // Sliced only if the customer asked AND the product offers it.
+    const sliced =
+      Boolean(slicedByProduct.get(productId)) && Boolean(product.allow_slicing);
     items.push({
       product_id: productId,
       product_name: product.name, // snapshot at order time
       quantity: qty,
       unit_price: unitPrice,
       line_total: round2(unitPrice * qty),
+      sliced,
     });
   }
   if (items.length === 0) {
@@ -127,18 +148,24 @@ export async function priceOrder(opts: {
   }
 
   const subtotal = round2(items.reduce((s, i) => s + i.line_total, 0));
+  // Slicing: the customer's negotiated per-dozen rate × total sliced quantity.
+  // Computed before the delivery fee so it counts toward the free-delivery
+  // minimum (it's revenue on the order like the goods).
+  const sliceRate = Number(customer.slice_fee) || 0;
+  const slicedQty = items.reduce((s, i) => (i.sliced ? s + i.quantity : s), 0);
+  const sliceFee = round2(sliceRate * slicedQty);
   // Delivery fee applies only to delivery orders below the (admin-set) minimum,
-  // unless the customer is exempt.
+  // unless the customer is exempt. Subtotal + slicing is what must clear the bar.
   const settings = await getSettings();
   const deliveryFee =
     type === "delivery" &&
     !customer.waive_delivery_minimum &&
-    subtotal < settings.deliveryMinimum
+    subtotal + sliceFee < settings.deliveryMinimum
       ? settings.deliveryFee
       : 0;
-  const total = round2(subtotal + deliveryFee);
+  const total = round2(subtotal + deliveryFee + sliceFee);
 
-  return { customer, items, subtotal, deliveryFee, total };
+  return { customer, items, subtotal, deliveryFee, sliceFee, total };
 }
 
 export async function createOrderForCustomer(opts: {
@@ -167,7 +194,7 @@ export async function createOrderForCustomer(opts: {
       skipUnavailable: opts.skipUnavailable,
     }));
   if ("error" in priced) return { error: priced.error };
-  const { customer, items: orderItems, deliveryFee, total } = priced;
+  const { customer, items: orderItems, deliveryFee, sliceFee, total } = priced;
 
   const admin = createAdminClient();
 
@@ -177,6 +204,8 @@ export async function createOrderForCustomer(opts: {
     customer_id: customer.id,
     total_amount: total,
     delivery_fee: deliveryFee,
+    // Older pay-first snapshots (created before slicing) have no sliceFee.
+    slice_fee: sliceFee ?? 0,
     fulfillment_type: type,
     delivery_date: date,
     delivery_time: customer.delivery_window, // the customer's assigned window

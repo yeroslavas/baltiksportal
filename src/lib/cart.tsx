@@ -16,6 +16,9 @@ export type CartItem = {
   unitPrice: number; // the customer's price at add-time (display only)
   // When true, orderable in 0.5 increments (half-dozen); otherwise whole units.
   allowHalf: boolean;
+  // Whether this item can be sliced, and whether the customer chose to.
+  allowSlicing: boolean;
+  sliced: boolean;
   quantity: number;
 };
 
@@ -32,6 +35,7 @@ type CartContextValue = {
   total: number;
   addItem: (item: Omit<CartItem, "quantity">, qty: number) => void;
   updateQuantity: (productId: string, qty: number) => void;
+  setSliced: (productId: string, sliced: boolean) => void;
   removeItem: (productId: string) => void;
   clear: () => void;
 };
@@ -78,7 +82,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         if (existing) {
           return prev.map((i) =>
             i.productId === item.productId
-              ? { ...i, quantity: i.quantity + quantity }
+              ? { ...i, quantity: i.quantity + quantity, sliced: item.sliced }
               : i,
           );
         }
@@ -99,6 +103,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const setSliced = useCallback((productId: string, sliced: boolean) => {
+    setItems((prev) =>
+      prev.map((i) => (i.productId === productId ? { ...i, sliced } : i)),
+    );
+  }, []);
+
   const removeItem = useCallback((productId: string) => {
     setItems((prev) => prev.filter((i) => i.productId !== productId));
   }, []);
@@ -108,8 +118,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<CartContextValue>(() => {
     const count = items.reduce((sum, i) => sum + i.quantity, 0);
     const total = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
-    return { items, count, total, addItem, updateQuantity, removeItem, clear };
-  }, [items, addItem, updateQuantity, removeItem, clear]);
+    return {
+      items,
+      count,
+      total,
+      addItem,
+      updateQuantity,
+      setSliced,
+      removeItem,
+      clear,
+    };
+  }, [items, addItem, updateQuantity, setSliced, removeItem, clear]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

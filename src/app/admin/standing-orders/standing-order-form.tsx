@@ -32,6 +32,7 @@ export type StandingOrderInitial = {
   skipDates: string[];
   note: string | null;
   items: Record<string, number>; // productId -> quantity
+  slicedItems: string[]; // product ids ordered sliced
 };
 
 export function StandingOrderForm({
@@ -43,7 +44,13 @@ export function StandingOrderForm({
 }: {
   mode: "create" | "edit";
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
-  products: { id: string; name: string; unit: string; allowHalf: boolean }[];
+  products: {
+    id: string;
+    name: string;
+    unit: string;
+    allowHalf: boolean;
+    allowSlicing: boolean;
+  }[];
   customers?: { id: string; business_name: string }[];
   initial?: StandingOrderInitial;
 }) {
@@ -254,6 +261,17 @@ export function StandingOrderForm({
                 {p.name}
                 <span className="text-stone-400"> · {p.unit}</span>
               </span>
+              {p.allowSlicing ? (
+                <label className="flex shrink-0 items-center gap-1.5 text-xs text-stone-500">
+                  <input
+                    type="checkbox"
+                    name={`slice:${p.id}`}
+                    defaultChecked={initial?.slicedItems.includes(p.id) ?? false}
+                    className="h-3.5 w-3.5 rounded border-stone-300 text-brand-600 focus:ring-2 focus:ring-brand-200"
+                  />
+                  Sliced
+                </label>
+              ) : null}
               <input
                 type="number"
                 min={0}

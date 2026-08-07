@@ -9,7 +9,7 @@ export default async function NewStandingOrderPage() {
     admin.from("customers").select("id, business_name").order("business_name"),
     admin
       .from("products")
-      .select("id, name, unit, allow_half_dozen")
+      .select("id, name, unit, allow_half_dozen, allow_slicing")
       .eq("is_active", true)
       .order("sort_order", { ascending: true, nullsFirst: false })
       .order("name"),
@@ -19,6 +19,7 @@ export default async function NewStandingOrderPage() {
     name: p.name,
     unit: p.unit,
     allowHalf: p.allow_half_dozen,
+    allowSlicing: p.allow_slicing,
   }));
 
   return (

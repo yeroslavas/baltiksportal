@@ -16,15 +16,16 @@ export default async function CatalogPage() {
   // aren't selected, and the API roles can't read them either (see schema.sql).
   const { data: customer } = await supabase
     .from("customers")
-    .select("id, business_name")
+    .select("id, business_name, slice_fee")
     .eq("user_id", user.id)
-    .maybeSingle<Pick<Customer, "id" | "business_name">>();
+    .maybeSingle<Pick<Customer, "id" | "business_name" | "slice_fee">>();
+  const sliceFee = Number(customer?.slice_fee ?? 0);
 
   // Active catalog + this customer's price overrides. Customer-facing columns
   // only (no sku/report_* — those are restricted from the API roles too).
   const { data: productsData } = await supabase
     .from("products")
-    .select("id, name, description, unit, base_price, sort_order, image_url, allow_half_dozen")
+    .select("id, name, description, unit, base_price, sort_order, image_url, allow_half_dozen, allow_slicing")
     .order("sort_order", { ascending: true, nullsFirst: false })
     .order("name");
   const products = (productsData ?? []) as Product[];
@@ -118,6 +119,8 @@ export default async function CatalogPage() {
                     unit={item.unit}
                     unitPrice={item.effective_price}
                     allowHalf={item.allow_half_dozen}
+                    allowSlicing={item.allow_slicing}
+                    sliceFee={sliceFee}
                   />
                 </div>
               </li>

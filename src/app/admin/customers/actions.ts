@@ -96,7 +96,7 @@ export async function duplicateCustomer(
   const { data: src } = await admin
     .from("customers")
     .select(
-      "delivery_window, sales_rep, tier, waive_delivery_minimum, allow_invoicing, invoice_terms_days",
+      "delivery_window, sales_rep, tier, waive_delivery_minimum, allow_invoicing, invoice_terms_days, slice_fee",
     )
     .eq("id", sourceId)
     .maybeSingle<{
@@ -106,6 +106,7 @@ export async function duplicateCustomer(
       waive_delivery_minimum: boolean;
       allow_invoicing: boolean;
       invoice_terms_days: number;
+      slice_fee: number;
     }>();
   if (!src) return { error: "Source customer not found.", success: null };
 
@@ -143,6 +144,7 @@ export async function duplicateCustomer(
       waive_delivery_minimum: src.waive_delivery_minimum,
       allow_invoicing: src.allow_invoicing,
       invoice_terms_days: src.invoice_terms_days,
+      slice_fee: src.slice_fee,
     })
     .select("id")
     .single();
@@ -215,6 +217,12 @@ export async function updateCustomer(
     };
   }
 
+  // Negotiated per-dozen slice fee (0 = none).
+  const sliceFee = Number(get("slice_fee").replace(/[$,\s]/g, ""));
+  if (!Number.isFinite(sliceFee) || sliceFee < 0) {
+    return { error: "Slice fee must be a number of 0 or more.", success: null };
+  }
+
   const admin = createAdminClient();
 
   // Need user_id (for the login) and the current email (to detect a change).
@@ -259,6 +267,7 @@ export async function updateCustomer(
       waive_delivery_minimum: formData.get("waive_delivery_minimum") === "on",
       allow_invoicing: formData.get("allow_invoicing") === "on",
       invoice_terms_days: termsDays,
+      slice_fee: Math.round(sliceFee * 100) / 100,
     })
     .eq("id", id);
   if (updateError) return { error: updateError.message, success: null };

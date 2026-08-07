@@ -76,6 +76,7 @@ export async function generateStandingOrders(
       const lines = (itemsBySo.get(so.id) ?? []).map((i) => ({
         productId: i.product_id,
         quantity: i.quantity,
+        sliced: i.sliced,
       }));
       if (lines.length === 0) {
         summary.skippedEmpty.push(so.id);

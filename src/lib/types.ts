@@ -18,6 +18,9 @@ export type Customer = {
   allow_invoicing: boolean;
   // Net payment terms: days after issue an invoice is due (default 30).
   invoice_terms_days: number;
+  // Negotiated per-dozen charge added when this customer orders a sliceable
+  // item sliced (0 = no slice fee). See products.allow_slicing.
+  slice_fee: number;
   created_at: string;
 };
 
@@ -30,6 +33,9 @@ export type Product = {
   is_active: boolean;
   // When true, orderable in 0.5 increments (half-dozen); otherwise whole units.
   allow_half_dozen: boolean;
+  // When true, the customer can request this item sliced (adds their negotiated
+  // per-customer slice fee — see customers.slice_fee).
+  allow_slicing: boolean;
   image_url: string | null;
   // Internal / reporting fields (not customer-facing; managed via CSV import).
   sku: string | null;
@@ -79,6 +85,8 @@ export type Order = {
   status: OrderStatus;
   total_amount: number;
   delivery_fee: number;
+  // Total slicing charge on this order (customer slice_fee × sliced quantity).
+  slice_fee: number;
   fulfillment_type: FulfillmentType;
   delivery_date: string | null;
   delivery_time: string | null;
@@ -95,6 +103,8 @@ export type OrderItem = {
   quantity: number;
   unit_price: number;
   line_total: number;
+  // Whether this line was ordered sliced (drives the order-level slice_fee).
+  sliced: boolean;
   created_at: string;
 };
 
@@ -119,6 +129,8 @@ export type StandingOrderItem = {
   standing_order_id: string;
   product_id: string;
   quantity: number;
+  // Whether the generated orders for this line should be sliced.
+  sliced: boolean;
   created_at: string;
 };
 

@@ -34,6 +34,7 @@ export function CheckoutView({
   deliveryWindow,
   deliveryFee: deliveryFeeRate,
   deliveryMinimum,
+  sliceFee,
   cutoff,
   availableDays,
   requiresPayment,
@@ -42,6 +43,8 @@ export function CheckoutView({
   deliveryWindow: string | null;
   deliveryFee: number;
   deliveryMinimum: number;
+  // Customer's per-dozen slice fee (0 = none).
+  sliceFee: number;
   // Next-day cutoff floor + label; null for admins or when the cutoff is off.
   cutoff: { earliestDate: string; label: string } | null;
   // Weekdays orders may be placed for (ISO 1–7); admins get all 7.
@@ -82,20 +85,30 @@ export function CheckoutView({
   );
   const ready = Boolean(date) && !dateClosed;
   const noun = fulfillment === "pickup" ? "Pickup" : "Delivery";
+  const slicedQty = items.reduce(
+    (s, i) => (i.allowSlicing && i.sliced ? s + i.quantity : s),
+    0,
+  );
+  const slicingTotal = Math.round(sliceFee * slicedQty * 100) / 100;
+  // Slicing counts toward the free-delivery minimum, like the goods.
   const deliveryFee =
     fulfillment === "delivery" &&
     !waiveDeliveryMinimum &&
-    total < deliveryMinimum
+    total + slicingTotal < deliveryMinimum
       ? deliveryFeeRate
       : 0;
-  const grandTotal = total + deliveryFee;
+  const grandTotal = total + deliveryFee + slicingTotal;
 
   async function confirm() {
     if (!ready) return;
     setSubmitting(true);
     setError(null);
     const res = await placeOrder(
-      items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+      items.map((i) => ({
+        productId: i.productId,
+        quantity: i.quantity,
+        sliced: i.sliced,
+      })),
       { type: fulfillment, date },
     );
     if (res.error) {
@@ -184,18 +197,31 @@ export function CheckoutView({
           >
             <span className="min-w-0 flex-1 truncate text-stone-700">
               {i.name} × {i.quantity}
+              {i.allowSlicing && i.sliced ? (
+                <span className="text-stone-400"> · sliced</span>
+              ) : null}
             </span>
             <span className="font-medium text-stone-900">
               {formatPrice(i.unitPrice * i.quantity)}
             </span>
           </li>
         ))}
+        {slicingTotal > 0 ? (
+          <li className="flex items-center justify-between gap-4 px-5 py-3 text-sm">
+            <span className="min-w-0 flex-1 truncate text-stone-700">
+              Slice fee
+            </span>
+            <span className="font-medium text-stone-900">
+              {formatPrice(slicingTotal)}
+            </span>
+          </li>
+        ) : null}
       </ul>
 
       <div className="space-y-2 rounded-2xl border border-stone-200 bg-white px-5 py-4">
         <div className="flex items-center justify-between text-sm">
           <span className="text-stone-500">Subtotal</span>
-          <span className="text-stone-900">{formatPrice(total)}</span>
+          <span className="text-stone-900">{formatPrice(total + slicingTotal)}</span>
         </div>
         {fulfillment === "delivery" ? (
           <div className="flex items-center justify-between text-sm">
@@ -216,7 +242,7 @@ export function CheckoutView({
         <p className="rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-800">
           Delivery orders under {formatPrice(deliveryMinimum)} include a{" "}
           {formatPrice(deliveryFeeRate)} delivery fee — add{" "}
-          {formatPrice(deliveryMinimum - total)} more to waive it.
+          {formatPrice(deliveryMinimum - total - slicingTotal)} more to waive it.
         </p>
       ) : fulfillment === "delivery" && waiveDeliveryMinimum ? (
         <p className="rounded-lg bg-green-50 px-3 py-2 text-xs text-green-800">

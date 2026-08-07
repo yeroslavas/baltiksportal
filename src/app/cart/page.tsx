@@ -11,9 +11,9 @@ export default async function CartPage() {
   const supabase = await createClient();
   const { data: customer } = await supabase
     .from("customers")
-    .select("business_name")
+    .select("business_name, slice_fee")
     .eq("user_id", user.id)
-    .maybeSingle<{ business_name: string }>();
+    .maybeSingle<{ business_name: string; slice_fee: number }>();
 
   return (
     <div className="flex flex-1 flex-col">
@@ -29,6 +29,7 @@ export default async function CartPage() {
         <CartView
           deliveryFee={settings.deliveryFee}
           deliveryMinimum={settings.deliveryMinimum}
+          sliceFee={Number(customer?.slice_fee ?? 0)}
         />
       </main>
     </div>

@@ -110,6 +110,11 @@ export default async function OrderDetailPage({
                 >
                   <td className="px-5 py-3 font-medium text-stone-900">
                     {i.product_name}
+                    {i.sliced ? (
+                      <span className="ml-2 text-xs font-normal text-stone-500">
+                        · sliced
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-5 py-3 text-right text-stone-600">
                     {i.quantity}
@@ -122,6 +127,18 @@ export default async function OrderDetailPage({
                   </td>
                 </tr>
               ))}
+              {(order.slice_fee ?? 0) > 0 ? (
+                <tr className="border-b border-stone-100 last:border-0">
+                  <td className="px-5 py-3 font-medium text-stone-900">
+                    Slice fee
+                  </td>
+                  <td className="px-5 py-3" />
+                  <td className="px-5 py-3" />
+                  <td className="px-5 py-3 text-right font-medium text-stone-900">
+                    {formatPrice(order.slice_fee)}
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
             <tfoot>
               <tr className="border-t border-stone-200">

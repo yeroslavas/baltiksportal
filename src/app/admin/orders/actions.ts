@@ -16,7 +16,7 @@ export type AdminOrderResult =
 // cutoff or closed-days rules (the admin is intentionally overriding).
 export async function createOrderAsAdmin(
   customerId: string,
-  lines: { productId: string; quantity: number }[],
+  lines: { productId: string; quantity: number; sliced?: boolean }[],
   fulfillment: { type: string; date: string },
 ): Promise<AdminOrderResult> {
   await requireAdmin();
@@ -40,6 +40,7 @@ export async function createOrderAsAdmin(
     .map((l) => ({
       productId: String(l?.productId ?? ""),
       quantity: Number(l?.quantity),
+      sliced: Boolean(l?.sliced),
     }))
     .filter((l) => l.productId && Number.isFinite(l.quantity) && l.quantity > 0);
   if (cleanLines.length === 0) {

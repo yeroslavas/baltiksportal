@@ -42,12 +42,13 @@ export async function GET(
       db
         .from("orders")
         .select(
-          "total_amount, delivery_fee, fulfillment_type, delivery_date, delivery_time",
+          "total_amount, delivery_fee, slice_fee, fulfillment_type, delivery_date, delivery_time",
         )
         .eq("id", invoice.order_id)
         .maybeSingle<{
           total_amount: number;
           delivery_fee: number;
+          slice_fee: number;
           fulfillment_type: "delivery" | "pickup";
           delivery_date: string | null;
           delivery_time: string | null;

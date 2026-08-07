@@ -57,6 +57,7 @@ export default async function AdminInvoiceDetailPage({
   ]);
   const items = (itemsData ?? []) as OrderItem[];
   const deliveryFee = order?.delivery_fee ?? 0;
+  const sliceFee = Number(order?.slice_fee ?? 0);
   const credit = Number(invoice.credit_amount ?? 0);
   const amountDue = invoiceAmountDue(invoice);
   const canCredit = invoice.status === "unpaid" || invoice.status === "overdue";
@@ -198,6 +199,18 @@ export default async function AdminInvoiceDetailPage({
                 </td>
               </tr>
             ))}
+            {sliceFee > 0 ? (
+              <tr className="border-b border-stone-100 last:border-0">
+                <td className="px-6 py-3 font-medium text-stone-900">
+                  Slice fee
+                </td>
+                <td className="px-6 py-3" />
+                <td className="px-6 py-3" />
+                <td className="px-6 py-3 text-right font-medium text-stone-900">
+                  {formatPrice(sliceFee)}
+                </td>
+              </tr>
+            ) : null}
           </tbody>
           <tfoot>
             <tr className="border-t border-stone-200">

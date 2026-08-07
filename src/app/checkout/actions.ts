@@ -21,7 +21,7 @@ const WEEKDAY_NAME = [
   "Sunday",
 ];
 
-type CartLine = { productId: string; quantity: number };
+type CartLine = { productId: string; quantity: number; sliced?: boolean };
 type Fulfillment = { type: string; date: string };
 type PlaceOrderResult =
   | {
@@ -120,6 +120,7 @@ export async function placeOrder(
   const cleanLines = lines.map((l) => ({
     productId: l.productId,
     quantity: l.quantity,
+    sliced: Boolean(l.sliced),
   }));
 
   // Invoicing customers: create the order now and pay the invoice later.
