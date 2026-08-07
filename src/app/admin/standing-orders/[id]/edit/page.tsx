@@ -30,7 +30,7 @@ export default async function EditStandingOrderPage({
         .eq("standing_order_id", id),
       admin
         .from("products")
-        .select("id, name, unit, sort_order, allow_half_dozen")
+        .select("id, name, unit, sort_order, allow_half_dozen, allow_slicing")
         .eq("is_active", true)
         .order("sort_order", { ascending: true, nullsFirst: false })
         .order("name"),
@@ -62,6 +62,7 @@ export default async function EditStandingOrderPage({
     unit: string;
     sort_order: number | null;
     allow_half_dozen: boolean;
+    allow_slicing: boolean;
   };
   const products = [...(activeProducts ?? [])] as Prod[];
   const present = new Set(products.map((p) => p.id));
@@ -93,6 +94,7 @@ export default async function EditStandingOrderPage({
     skipDates: so.skip_dates,
     note: so.note,
     items: Object.fromEntries(items.map((i) => [i.product_id, i.quantity])),
+    slicedItems: items.filter((i) => i.sliced).map((i) => i.product_id),
   };
 
   return (
@@ -125,6 +127,7 @@ export default async function EditStandingOrderPage({
             name: p.name,
             unit: p.unit,
             allowHalf: p.allow_half_dozen,
+            allowSlicing: p.allow_slicing,
           }))}
           initial={initial}
         />

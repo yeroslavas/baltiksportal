@@ -20,7 +20,7 @@ type Parsed = {
   isActive: boolean;
   note: string | null;
   skipDates: string[];
-  items: { productId: string; quantity: number }[];
+  items: { productId: string; quantity: number; sliced: boolean }[];
 };
 
 // Shared parse + validate for both create and update. Async because it snaps
@@ -72,11 +72,15 @@ async function parseForm(
   ].sort();
 
   const rawItems: { productId: string; quantity: number }[] = [];
+  const slicedSet = new Set<string>();
   for (const [key, value] of formData.entries()) {
-    if (!key.startsWith("qty:")) continue;
-    const quantity = Number(value);
-    if (Number.isFinite(quantity) && quantity > 0) {
-      rawItems.push({ productId: key.slice(4), quantity });
+    if (key.startsWith("qty:")) {
+      const quantity = Number(value);
+      if (Number.isFinite(quantity) && quantity > 0) {
+        rawItems.push({ productId: key.slice(4), quantity });
+      }
+    } else if (key.startsWith("slice:") && (value === "on" || value === "true")) {
+      slicedSet.add(key.slice(6));
     }
   }
   if (rawItems.length === 0) {
@@ -98,7 +102,11 @@ async function parseForm(
   const items = rawItems
     .map((i) => {
       const step = halfById.get(i.productId) ? 0.5 : 1;
-      return { productId: i.productId, quantity: Math.round(i.quantity / step) * step };
+      return {
+        productId: i.productId,
+        quantity: Math.round(i.quantity / step) * step,
+        sliced: slicedSet.has(i.productId),
+      };
     })
     .filter((i) => i.quantity > 0);
   if (items.length === 0) {
@@ -160,6 +168,7 @@ export async function createStandingOrder(
         standing_order_id: so.id,
         product_id: i.productId,
         quantity: i.quantity,
+        sliced: i.sliced,
       })),
     );
   if (itemsErr) {
@@ -200,6 +209,7 @@ export async function updateStandingOrder(
         standing_order_id: id,
         product_id: i.productId,
         quantity: i.quantity,
+        sliced: i.sliced,
       })),
     );
   if (itemsErr) return { error: itemsErr.message, success: null };

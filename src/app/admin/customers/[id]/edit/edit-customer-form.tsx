@@ -198,6 +198,24 @@ export function EditCustomerForm({
         </p>
       </div>
 
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-stone-700">
+          Slice fee (per dozen, USD)
+        </label>
+        <input
+          name="slice_fee"
+          type="number"
+          min="0"
+          step="0.01"
+          defaultValue={customer.slice_fee}
+          className={inputClass}
+        />
+        <p className="text-xs text-stone-500">
+          Negotiated per-dozen charge added when this customer orders a sliceable
+          item sliced. 0 = no slice fee.
+        </p>
+      </div>
+
       {state.error ? (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-2">
           {state.error}

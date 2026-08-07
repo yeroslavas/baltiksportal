@@ -127,6 +127,7 @@ export async function createProduct(
     unit,
     base_price: basePrice,
     allow_half_dozen: formData.get("allow_half_dozen") === "on",
+    allow_slicing: formData.get("allow_slicing") === "on",
     bake_time: get("bake_time") || null,
     product_type: get("product_type") || null,
     // SKU convention drives the group; manual entry is only a fallback.
@@ -198,6 +199,7 @@ export async function updateProduct(
     unit: get("unit") || "dozen",
     base_price: basePrice,
     allow_half_dozen: formData.get("allow_half_dozen") === "on",
+    allow_slicing: formData.get("allow_slicing") === "on",
     bake_time: get("bake_time") || null,
     product_type: get("product_type") || null,
     // SKU convention drives the group; manual entry is only a fallback.

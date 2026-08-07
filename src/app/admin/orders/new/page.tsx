@@ -10,6 +10,7 @@ type Cust = {
   business_name: string;
   delivery_window: string | null;
   waive_delivery_minimum: boolean;
+  slice_fee: number;
 };
 
 export default async function AdminNewOrderPage({
@@ -24,7 +25,9 @@ export default async function AdminNewOrderPage({
     await Promise.all([
       admin
         .from("customers")
-        .select("id, business_name, delivery_window, waive_delivery_minimum")
+        .select(
+          "id, business_name, delivery_window, waive_delivery_minimum, slice_fee",
+        )
         .order("business_name"),
       admin
         .from("products")
@@ -48,6 +51,7 @@ export default async function AdminNewOrderPage({
     price: number;
     hasOverride: boolean;
     allowHalf: boolean;
+    allowSlicing: boolean;
   }[] = [];
   if (selected) {
     const { data: pricingData } = await admin
@@ -66,6 +70,7 @@ export default async function AdminNewOrderPage({
         : Number(p.base_price),
       hasOverride: overrides.has(p.id),
       allowHalf: p.allow_half_dozen,
+      allowSlicing: p.allow_slicing,
     }));
   }
 
@@ -137,6 +142,7 @@ export default async function AdminNewOrderPage({
             products={priced}
             deliveryFee={settings.deliveryFee}
             deliveryMinimum={settings.deliveryMinimum}
+            sliceFee={Number(selected.slice_fee ?? 0)}
             minDate={businessToday()}
           />
         </section>

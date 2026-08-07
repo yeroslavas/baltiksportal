@@ -136,6 +136,20 @@ export function EditProductForm({
         </span>
       </label>
 
+      <label className="flex items-start gap-2.5 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 sm:col-span-2">
+        <input
+          type="checkbox"
+          name="allow_slicing"
+          defaultChecked={product.allow_slicing}
+          className="mt-0.5 h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-2 focus:ring-brand-200"
+        />
+        <span className="text-sm text-stone-700">
+          <span className="font-medium">Offer sliced</span> — lets customers
+          request this item sliced at checkout, adding their negotiated per-dozen
+          slice fee. Typically on for bagels by the dozen.
+        </span>
+      </label>
+
       <div className="flex flex-col gap-1.5 sm:col-span-2">
         <label className="text-sm font-medium text-stone-700">
           Position in catalog

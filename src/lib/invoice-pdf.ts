@@ -20,6 +20,7 @@ export type InvoicePdfInput = {
   order: {
     total_amount: number;
     delivery_fee: number;
+    slice_fee: number;
     fulfillment_type: FulfillmentType;
     delivery_date: string | null;
     delivery_time: string | null;
@@ -227,6 +228,7 @@ function drawInvoice(doc: PDFDocument, assets: Assets, input: InvoicePdfInput) {
   y -= 18;
 
   // --- Line-item table (paginates onto continuation pages). -------------------
+  const sliceFee = Number(order.slice_fee ?? 0);
   drawTableHeader();
   for (const item of items) {
     if (y < CONTENT_BOTTOM) continuePage(true);
@@ -234,6 +236,13 @@ function drawInvoice(doc: PDFDocument, assets: Assets, input: InvoicePdfInput) {
     textRight(String(item.quantity), COL_QTY_R, y, 10, font, INK);
     textRight(formatPrice(item.unit_price), COL_UNIT_R, y, 10, font, INK);
     textRight(formatPrice(item.line_total), COL_TOTAL_R, y, 10, font, INK);
+    y -= 20;
+  }
+  // Slicing is billed as its own line item, so it rolls into the subtotal.
+  if (sliceFee > 0) {
+    if (y < CONTENT_BOTTOM) continuePage(true);
+    text("Slice fee", MARGIN, y, 10);
+    textRight(formatPrice(sliceFee), COL_TOTAL_R, y, 10, font, INK);
     y -= 20;
   }
 

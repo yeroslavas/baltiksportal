@@ -50,6 +50,13 @@ alter table public.customers add column if not exists autopay_enabled boolean no
 alter table public.customers add column if not exists autopay_payment_method_id text;
 alter table public.customers add column if not exists autopay_bank_last4 text;
 alter table public.customers add column if not exists autopay_fail_count integer not null default 0;
+-- Per-dozen slice fee. Standard rate is $1.20/doz for every account; negotiable
+-- per customer on the edit page. Customer-readable (see grants) so the cart can
+-- show it. See products.allow_slicing.
+alter table public.customers add column if not exists slice_fee numeric(10,2) not null default 1.20 check (slice_fee >= 0);
+-- Move the standard rate to 1.20 for existing installs (add-column above won't
+-- change a pre-existing column's default).
+alter table public.customers alter column slice_fee set default 1.20;
 
 -- Products: the catalog. base_price applies unless a customer override exists.
 -- name/description/unit/base_price are customer-facing; sku + the report_*/
@@ -64,6 +71,8 @@ create table if not exists public.products (
   -- When true, this product can be ordered in 0.5 increments (half-dozen).
   -- Off by default → whole units only (discrete packs).
   allow_half_dozen boolean not null default false,
+  -- When true, the item can be ordered sliced (adds the customer's slice_fee).
+  allow_slicing boolean not null default false,
   image_url     text,
   sku           text,
   bake_time     text,
@@ -86,6 +95,8 @@ alter table public.products add column if not exists report_count integer;
 alter table public.products add column if not exists sort_order   numeric;
 alter table public.products add column if not exists image_url    text;
 alter table public.products add column if not exists allow_half_dozen boolean not null default false;
+-- Sliceable flag (no-op on fresh installs). Customer-readable (see grants).
+alter table public.products add column if not exists allow_slicing boolean not null default false;
 -- sort_order is numeric so new products can be inserted between two existing
 -- ones (e.g. 5.5 between 5 and 6) without renumbering the rest.
 alter table public.products alter column sort_order type numeric;
@@ -156,12 +167,12 @@ create policy "read own pricing"
 
 -- customers: hide sales_rep, tier, notes (internal admin fields).
 revoke select on public.customers from anon, authenticated;
-grant select (id, user_id, business_name, contact_name, email, phone, address, autopay_enabled, autopay_bank_last4, created_at)
+grant select (id, user_id, business_name, contact_name, email, phone, address, autopay_enabled, autopay_bank_last4, slice_fee, created_at)
   on public.customers to anon, authenticated;
 
 -- products: hide sku, bake_time, product_type, report_* (internal/reporting).
 revoke select on public.products from anon, authenticated;
-grant select (id, name, description, unit, base_price, is_active, sort_order, image_url, allow_half_dozen, created_at)
+grant select (id, name, description, unit, base_price, is_active, sort_order, image_url, allow_half_dozen, allow_slicing, created_at)
   on public.products to anon, authenticated;
 
 -- ----------------------------------------------------------------------------
@@ -214,6 +225,14 @@ alter table public.orders add column if not exists fulfillment_type text not nul
   default 'delivery' check (fulfillment_type in ('delivery', 'pickup'));
 alter table public.orders add column if not exists delivery_date date;
 alter table public.orders add column if not exists delivery_time text;
+
+-- Slicing: sliceable items (products.allow_slicing) can be ordered sliced, adding
+-- the customer's negotiated per-dozen slice_fee. order_items.sliced marks the
+-- lines; orders.slice_fee is the order-level charge; standing_order_items.sliced
+-- carries the choice onto every order the generator makes. (No-ops on fresh.)
+alter table public.orders add column if not exists slice_fee numeric(10,2) not null default 0 check (slice_fee >= 0);
+alter table public.order_items add column if not exists sliced boolean not null default false;
+alter table public.standing_order_items add column if not exists sliced boolean not null default false;
 alter table public.orders add column if not exists delivery_fee numeric(10,2)
   not null default 0 check (delivery_fee >= 0);
 

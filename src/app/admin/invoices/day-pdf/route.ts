@@ -19,6 +19,7 @@ type Row = Invoice & {
     status: string;
     total_amount: number;
     delivery_fee: number;
+    slice_fee: number;
   } | null;
   customers: {
     business_name: string;
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest) {
   const { data: invData, error } = await admin
     .from("invoices")
     .select(
-      "*, orders!inner(fulfillment_type, delivery_date, delivery_time, status, total_amount, delivery_fee), customers(business_name, contact_name, address)",
+      "*, orders!inner(fulfillment_type, delivery_date, delivery_time, status, total_amount, delivery_fee, slice_fee), customers(business_name, contact_name, address)",
     )
     .eq("orders.delivery_date", date)
     .neq("orders.status", "canceled")
@@ -90,6 +91,7 @@ export async function GET(req: NextRequest) {
     order: {
       total_amount: Number(r.orders?.total_amount ?? r.total_amount),
       delivery_fee: Number(r.orders?.delivery_fee ?? 0),
+      slice_fee: Number(r.orders?.slice_fee ?? 0),
       fulfillment_type: r.orders?.fulfillment_type ?? "delivery",
       delivery_date: r.orders?.delivery_date ?? null,
       delivery_time: r.orders?.delivery_time ?? null,

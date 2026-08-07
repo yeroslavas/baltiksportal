@@ -12,6 +12,7 @@ type Priced = {
   price: number;
   hasOverride: boolean;
   allowHalf: boolean;
+  allowSlicing: boolean;
 };
 
 // Snap a typed quantity to the product's allowed increment (0.5 / whole).
@@ -31,6 +32,7 @@ export function CreateOrderForm({
   products,
   deliveryFee: deliveryFeeRate,
   deliveryMinimum,
+  sliceFee,
   minDate,
 }: {
   customerId: string;
@@ -39,6 +41,7 @@ export function CreateOrderForm({
   products: Priced[];
   deliveryFee: number;
   deliveryMinimum: number;
+  sliceFee: number;
   minDate: string;
 }) {
   const router = useRouter();
@@ -47,6 +50,7 @@ export function CreateOrderForm({
   );
   const [date, setDate] = useState("");
   const [qty, setQty] = useState<Record<string, string>>({});
+  const [sliced, setSliced] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,14 +58,20 @@ export function CreateOrderForm({
     .map((p) => ({ p, q: snapQty(p, qty[p.id]) }))
     .filter((x) => x.q > 0);
   const subtotal = lines.reduce((s, x) => s + x.p.price * x.q, 0);
+  const slicedQty = lines.reduce(
+    (s, x) => (x.p.allowSlicing && sliced[x.p.id] ? s + x.q : s),
+    0,
+  );
+  const slicingTotal = Math.round(sliceFee * slicedQty * 100) / 100;
+  // Slicing counts toward the free-delivery minimum, like the goods.
   const fee =
     fulfillment === "delivery" &&
     !waiveDeliveryMinimum &&
     subtotal > 0 &&
-    subtotal < deliveryMinimum
+    subtotal + slicingTotal < deliveryMinimum
       ? deliveryFeeRate
       : 0;
-  const total = subtotal + fee;
+  const total = subtotal + fee + slicingTotal;
   const noun = fulfillment === "pickup" ? "Pickup" : "Delivery";
   const ready = Boolean(date) && lines.length > 0 && !submitting;
 
@@ -71,7 +81,11 @@ export function CreateOrderForm({
     setError(null);
     const res = await createOrderAsAdmin(
       customerId,
-      lines.map((x) => ({ productId: x.p.id, quantity: x.q })),
+      lines.map((x) => ({
+        productId: x.p.id,
+        quantity: x.q,
+        sliced: Boolean(sliced[x.p.id]) && x.p.allowSlicing,
+      })),
       { type: fulfillment, date },
     );
     if (res.error) {
@@ -150,6 +164,25 @@ export function CreateOrderForm({
                         Your price
                       </span>
                     ) : null}
+                    {p.allowSlicing ? (
+                      <label className="mt-1 flex items-center gap-1.5 text-xs text-stone-500">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(sliced[p.id])}
+                          onChange={(e) =>
+                            setSliced((prev) => ({
+                              ...prev,
+                              [p.id]: e.target.checked,
+                            }))
+                          }
+                          className="h-3.5 w-3.5 rounded border-stone-300 text-brand-600 focus:ring-2 focus:ring-brand-200"
+                        />
+                        Sliced
+                        {sliceFee > 0
+                          ? ` (+${formatPrice(sliceFee)}/${p.unit})`
+                          : ""}
+                      </label>
+                    ) : null}
                   </td>
                   <td className="px-4 py-2 text-right text-stone-600">
                     {formatPrice(p.price)}
@@ -180,9 +213,17 @@ export function CreateOrderForm({
       </div>
 
       <div className="space-y-2 rounded-2xl border border-stone-200 bg-white px-5 py-4 sm:ml-auto sm:max-w-xs">
+        {slicingTotal > 0 ? (
+          <div className="flex justify-between text-sm">
+            <span className="pl-3 text-stone-400">Slicing</span>
+            <span className="text-stone-500">{formatPrice(slicingTotal)}</span>
+          </div>
+        ) : null}
         <div className="flex justify-between text-sm">
           <span className="text-stone-500">Subtotal</span>
-          <span className="text-stone-900">{formatPrice(subtotal)}</span>
+          <span className="text-stone-900">
+            {formatPrice(subtotal + slicingTotal)}
+          </span>
         </div>
         {fulfillment === "delivery" ? (
           <div className="flex justify-between text-sm">

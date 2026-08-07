@@ -38,7 +38,7 @@ export default async function CheckoutPage() {
   const { data: customer } = await admin
     .from("customers")
     .select(
-      "business_name, waive_delivery_minimum, delivery_window, allow_invoicing",
+      "business_name, waive_delivery_minimum, delivery_window, allow_invoicing, slice_fee",
     )
     .eq("user_id", user.id)
     .maybeSingle<{
@@ -46,6 +46,7 @@ export default async function CheckoutPage() {
       waive_delivery_minimum: boolean;
       delivery_window: string | null;
       allow_invoicing: boolean;
+      slice_fee: number;
     }>();
 
   return (
@@ -67,6 +68,7 @@ export default async function CheckoutPage() {
           deliveryWindow={customer?.delivery_window ?? null}
           deliveryFee={settings.deliveryFee}
           deliveryMinimum={settings.deliveryMinimum}
+          sliceFee={Number(customer?.slice_fee ?? 0)}
           cutoff={cutoff}
           availableDays={availableDays}
           requiresPayment={!userIsAdmin && !(customer?.allow_invoicing ?? false)}

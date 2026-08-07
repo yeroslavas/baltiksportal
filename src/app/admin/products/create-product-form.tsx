@@ -9,6 +9,9 @@ const initialState: ActionState = { error: null, success: null };
 const inputClass =
   "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200";
 
+// By-the-dozen products (unit "dozen"/"doz.") default to sliceable.
+const isDozenUnit = (u: string) => /doz/i.test(u.trim());
+
 export function CreateProductForm({
   products,
 }: {
@@ -20,8 +23,19 @@ export function CreateProductForm({
   );
   const formRef = useRef<HTMLFormElement>(null);
 
+  // "Offer sliced" follows the unit (auto-on for dozens) until the admin toggles
+  // it by hand, after which their choice sticks.
+  const [unit, setUnit] = useState("dozen");
+  const [sliced, setSliced] = useState(true);
+  const [slicedTouched, setSlicedTouched] = useState(false);
+
   useEffect(() => {
-    if (state.success) formRef.current?.reset();
+    if (state.success) {
+      formRef.current?.reset();
+      setUnit("dozen");
+      setSliced(true);
+      setSlicedTouched(false);
+    }
   }, [state.success]);
 
   const [fileError, setFileError] = useState<string | null>(null);
@@ -88,7 +102,12 @@ export function CreateProductForm({
         <label className="text-sm font-medium text-stone-700">Unit</label>
         <input
           name="unit"
-          defaultValue="dozen"
+          value={unit}
+          onChange={(e) => {
+            const v = e.target.value;
+            setUnit(v);
+            if (!slicedTouched) setSliced(isDozenUnit(v));
+          }}
           placeholder="dozen"
           className={inputClass}
         />
@@ -118,6 +137,24 @@ export function CreateProductForm({
           <span className="font-medium">Allow half-dozen orders</span> — lets
           customers order this item in 0.5 increments (e.g. 1.5 dozen). Leave off
           for discrete packs.
+        </span>
+      </label>
+
+      <label className="flex items-start gap-2.5 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 sm:col-span-2">
+        <input
+          type="checkbox"
+          name="allow_slicing"
+          checked={sliced}
+          onChange={(e) => {
+            setSliced(e.target.checked);
+            setSlicedTouched(true);
+          }}
+          className="mt-0.5 h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-2 focus:ring-brand-200"
+        />
+        <span className="text-sm text-stone-700">
+          <span className="font-medium">Offer sliced</span> — lets customers
+          request this item sliced at checkout, adding their negotiated per-dozen
+          slice fee. Auto-enabled for by-the-dozen units; uncheck to override.
         </span>
       </label>
 
