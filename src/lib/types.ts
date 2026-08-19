@@ -16,7 +16,8 @@ export type Customer = {
   notes: string | null;
   waive_delivery_minimum: boolean;
   allow_invoicing: boolean;
-  // Net payment terms: days after issue an invoice is due (default 30).
+  // Net payment terms: days after the order's delivery/pickup date an invoice
+  // is due (default 7).
   invoice_terms_days: number;
   // Negotiated per-dozen charge added when this customer orders a sliceable
   // item sliced (0 = no slice fee). See products.allow_slicing.
@@ -147,8 +148,8 @@ export type Invoice = {
   invoice_number: string; // human-readable, e.g. "INV-0001"
   customer_id: string;
   order_id: string;
-  issue_date: string; // "YYYY-MM-DD"
-  due_date: string; // "YYYY-MM-DD" (default 30 days after issue)
+  issue_date: string; // "YYYY-MM-DD" (the day the invoice was generated)
+  due_date: string; // "YYYY-MM-DD" (fulfillment date + customer's net terms)
   status: InvoiceStatus;
   total_amount: number;
   // Admin-applied credit/adjustment (shorted/damaged order, pricing fix). The

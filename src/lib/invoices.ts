@@ -39,17 +39,27 @@ export async function createInvoiceForOrder(opts: {
 }): Promise<CreateInvoiceResult> {
   const admin = opts.admin ?? createAdminClient();
 
-  // Due date = issue date + this customer's net terms (days). Computed in the
-  // business timezone for consistency with the rest of the app; falls back to
-  // 30 days if the customer row is somehow missing the value.
-  const { data: cust } = await admin
-    .from("customers")
-    .select("invoice_terms_days")
-    .eq("id", opts.customerId)
-    .maybeSingle<{ invoice_terms_days: number | null }>();
+  // Net terms run from the order's fulfillment (delivery/pickup) date, not the
+  // issue date — so the clock starts when the customer receives the order, not
+  // when the invoice is generated (which, for standing orders, is days ahead).
+  // Computed in the business timezone; falls back to 7-day terms if the customer
+  // row is missing the value, and to the issue date if the order has no
+  // fulfillment date (shouldn't happen — every order is dated at creation).
+  const [{ data: cust }, { data: order }] = await Promise.all([
+    admin
+      .from("customers")
+      .select("invoice_terms_days")
+      .eq("id", opts.customerId)
+      .maybeSingle<{ invoice_terms_days: number | null }>(),
+    admin
+      .from("orders")
+      .select("delivery_date")
+      .eq("id", opts.orderId)
+      .maybeSingle<{ delivery_date: string | null }>(),
+  ]);
   const termsDays = cust?.invoice_terms_days ?? 7;
   const issueDate = businessToday();
-  const dueDate = addDays(issueDate, termsDays);
+  const dueDate = addDays(order?.delivery_date ?? issueDate, termsDays);
 
   // ON CONFLICT (order_id) DO NOTHING. ignoreDuplicates means an existing row
   // yields no returned row — which we report as "exists" rather than an error.

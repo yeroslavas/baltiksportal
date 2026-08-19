@@ -193,8 +193,8 @@ export function EditCustomerForm({
           className={inputClass}
         />
         <p className="text-xs text-stone-500">
-          Net days after issue an invoice is due (e.g. 7). Used when generating
-          this customer&apos;s invoices.
+          Net days after delivery an invoice is due (e.g. 7). Used when
+          generating this customer&apos;s invoices.
         </p>
       </div>
 
