@@ -27,8 +27,9 @@ export default async function CheckoutSuccessPage() {
           </h1>
           <p className="mx-auto mt-3 max-w-md text-sm text-green-800">
             Your payment was submitted and your order is being placed — it&apos;ll
-            show up in your order history shortly. Bank (ACH) transfers can take a
-            few business days to fully clear, but your order is confirmed.
+            show up in your order history shortly. Card payments confirm right
+            away; bank (ACH) transfers can take a few business days to fully
+            clear, but your order is confirmed.
           </p>
           <div className="mt-7 flex flex-wrap justify-center gap-3">
             <Link

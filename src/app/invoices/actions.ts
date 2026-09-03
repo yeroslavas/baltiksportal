@@ -66,7 +66,9 @@ export async function payInvoice(formData: FormData) {
     });
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",
-      payment_method_types: ["us_bank_account"],
+      // ACH (preferred) or card. No surcharge — we absorb card fees; US rules
+      // forbid surcharging debit, which hosted Checkout can't distinguish.
+      payment_method_types: ["us_bank_account", "card"],
       customer: stripeCustomerId,
       line_items: [
         {
@@ -161,7 +163,9 @@ export async function payInvoices(formData: FormData) {
     });
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",
-      payment_method_types: ["us_bank_account"],
+      // ACH (preferred) or card. No surcharge — we absorb card fees; US rules
+      // forbid surcharging debit, which hosted Checkout can't distinguish.
+      payment_method_types: ["us_bank_account", "card"],
       customer: stripeCustomerId,
       line_items: payable.map((i) => ({
         quantity: 1,
