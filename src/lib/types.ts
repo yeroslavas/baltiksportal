@@ -25,6 +25,10 @@ export type Customer = {
   // Time-boxed credit-hold override ("YYYY-MM-DD" or null): while today or later,
   // the customer may order despite overdue invoices (admin-granted; auto-expires).
   credit_hold_override_until: string | null;
+  // Audit trail for the override: why it was granted, which admin set it, when.
+  credit_hold_override_reason: string | null;
+  credit_hold_override_set_by: string | null;
+  credit_hold_override_set_at: string | null;
   created_at: string;
 };
 

@@ -9,6 +9,7 @@ import { RecomputeOverdueButton } from "./recompute-overdue-button";
 import { ReconcileButton } from "./reconcile-button";
 import { RunAutopayButton } from "./run-autopay-button";
 import { InvoiceDisplayBadge } from "@/components/invoice-display-badge";
+import { CreditOverrideBadge } from "@/components/credit-override-badge";
 import type { Invoice } from "@/lib/types";
 
 type EnrolledCustomer = {
@@ -19,7 +20,11 @@ type EnrolledCustomer = {
 };
 
 type InvoiceRow = Invoice & {
-  customers: { business_name: string } | null;
+  customers: {
+    business_name: string;
+    credit_hold_override_until: string | null;
+    credit_hold_override_reason: string | null;
+  } | null;
   orders: { order_number: number; delivery_date: string | null } | null;
 };
 
@@ -115,7 +120,7 @@ export default async function AdminInvoicesPage({
   let dataQuery = admin
     .from("invoices")
     .select(
-      "*, customers!inner(business_name), orders(order_number, delivery_date)",
+      "*, customers!inner(business_name, credit_hold_override_until, credit_hold_override_reason), orders(order_number, delivery_date)",
     )
     .order(SORTS[sort], { ascending: dir === "asc" });
   if (sort !== "invoice") {
@@ -445,7 +450,15 @@ export default async function AdminInvoicesPage({
                       {inv.invoice_number}
                     </td>
                     <td className="px-6 py-3 text-stone-600">
-                      {inv.customers?.business_name ?? "—"}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span>{inv.customers?.business_name ?? "—"}</span>
+                        {inv.status === "unpaid" || inv.status === "overdue" ? (
+                          <CreditOverrideBadge
+                            until={inv.customers?.credit_hold_override_until ?? null}
+                            reason={inv.customers?.credit_hold_override_reason ?? null}
+                          />
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-6 py-3 text-stone-600">
                       {inv.orders?.order_number ? `#${inv.orders.order_number}` : "—"}

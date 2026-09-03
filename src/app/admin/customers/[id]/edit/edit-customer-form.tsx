@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { updateCustomer, type ActionState } from "../../actions";
 import { PhoneInput } from "@/components/phone-input";
 import { submitOnEnter } from "@/lib/submit-on-enter";
+import { formatDate } from "@/lib/format";
 import type { Customer } from "@/lib/types";
 
 const initialState: ActionState = { error: null, success: null };
@@ -188,11 +189,23 @@ export function EditCustomerForm({
           defaultValue={customer.credit_hold_override_until ?? ""}
           className={inputClass}
         />
+        <input
+          name="credit_hold_override_reason"
+          defaultValue={customer.credit_hold_override_reason ?? ""}
+          placeholder="Reason (e.g. payment plan agreed, check in mail)"
+          className={inputClass}
+        />
         <p className="text-xs text-stone-500">
-          Temporary credit-hold override. While set to today or a future date,
-          this customer can place orders even with overdue invoices. Leave blank
-          for the normal hold; it auto-expires after this date.
+          Temporary credit-hold override. While the date is set to today or a
+          future date, this customer can place orders even with overdue invoices.
+          Leave the date blank for the normal hold; it auto-expires afterward.
         </p>
+        {customer.credit_hold_override_set_at ? (
+          <p className="text-xs text-stone-400">
+            Set by {customer.credit_hold_override_set_by ?? "an admin"} on{" "}
+            {formatDate(customer.credit_hold_override_set_at)}.
+          </p>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-1.5">
