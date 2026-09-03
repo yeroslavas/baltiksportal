@@ -6,7 +6,7 @@ import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/pagination";
 import { SortableHeader, type SortDir } from "@/components/sortable-header";
 import { businessToday } from "@/lib/standing-orders";
 import { creditOverrideActive } from "@/lib/invoices";
-import { CreditStatusTag } from "@/components/credit-status-tag";
+import { CreditStatusTag, type CreditStatus } from "@/components/credit-status-tag";
 import type { Customer } from "@/lib/types";
 import { CreateCustomerForm } from "./create-customer-form";
 import { ResetPasswordForm } from "./reset-password-form";
@@ -36,7 +36,12 @@ export default async function AdminCustomersPage({
     override: overrideParam,
   } = await searchParams;
   const page = Math.max(1, Math.floor(Number(pageParam)) || 1);
-  const sort = sortParam && SORTS[sortParam] ? sortParam : "business";
+  const sort =
+    sortParam === "credit"
+      ? "credit"
+      : sortParam && SORTS[sortParam]
+        ? sortParam
+        : "business";
   const dir: SortDir = dirParam === "desc" ? "desc" : "asc";
   const q = (qParam ?? "").trim().slice(0, 80);
   const overrideOnly = overrideParam === "1";
@@ -64,51 +69,84 @@ export default async function AdminCustomersPage({
   };
 
   const admin = createAdminClient();
+  const today = businessToday();
   const from = (page - 1) * DEFAULT_PAGE_SIZE;
   const to = from + DEFAULT_PAGE_SIZE - 1;
-  let query = admin
-    .from("customers")
-    .select("*", { count: "exact" })
-    .order(SORTS[sort], { ascending: dir === "asc" });
-  if (safeQ) {
-    query = query.or(
-      `business_name.ilike.*${safeQ}*,contact_name.ilike.*${safeQ}*,email.ilike.*${safeQ}*`,
-    );
-  }
-  // Active credit-hold overrides only: override date today or later.
-  if (overrideOnly) {
-    query = query.gte("credit_hold_override_until", businessToday());
-  }
-  const { data, count } = await query.range(from, to);
-  const customers = (data ?? []) as Customer[];
-  const total = count ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
 
+  // Base filtered query (search + active-override filter), shared by the DB-sorted
+  // path and the derived credit-status sort.
+  const filtered = () => {
+    let query = admin.from("customers").select("*", { count: "exact" });
+    if (safeQ) {
+      query = query.or(
+        `business_name.ilike.*${safeQ}*,contact_name.ilike.*${safeQ}*,email.ilike.*${safeQ}*`,
+      );
+    }
+    if (overrideOnly) query = query.gte("credit_hold_override_until", today);
+    return query;
+  };
+
+  // Who has qualifying overdue invoices among the given customers — same canonical
+  // rule as getOverdueInvoices (status 'overdue' OR unpaid-past-due, no payment in
+  // flight). Drives the credit-status tag.
+  const fetchOverdueSet = async (ids: string[]): Promise<Set<string>> => {
+    const set = new Set<string>();
+    if (ids.length === 0) return set;
+    const { data: rows } = await admin
+      .from("invoices")
+      .select("customer_id")
+      .in("customer_id", ids)
+      .or(`status.eq.overdue,and(status.eq.unpaid,due_date.lt.${today})`)
+      .is("stripe_payment_id", null);
+    for (const r of rows ?? []) set.add(r.customer_id as string);
+    return set;
+  };
+
+  const statusOf = (c: Customer, overdue: Set<string>): CreditStatus =>
+    creditOverrideActive(c.credit_hold_override_until)
+      ? "override"
+      : overdue.has(c.id)
+        ? "stop"
+        : "current";
+
+  let customers: Customer[];
+  let total: number;
+  let overdueSet: Set<string>;
+
+  if (sort === "credit") {
+    // Derived column: fetch the whole filtered set, compute status, sort by it
+    // (stop → override → current when ascending), then paginate in memory. Fine
+    // at this scale, and a true global sort rather than sorting only one page.
+    const { data } = await filtered().order("business_name", { ascending: true });
+    const all = (data ?? []) as Customer[];
+    overdueSet = await fetchOverdueSet(all.map((c) => c.id));
+    const rank: Record<CreditStatus, number> = { stop: 0, override: 1, current: 2 };
+    const sorted = [...all].sort((a, b) => {
+      const d = rank[statusOf(a, overdueSet)] - rank[statusOf(b, overdueSet)];
+      return d !== 0
+        ? dir === "asc"
+          ? d
+          : -d
+        : a.business_name.localeCompare(b.business_name);
+    });
+    total = sorted.length;
+    customers = sorted.slice(from, to + 1);
+  } else {
+    const { data, count } = await filtered()
+      .order(SORTS[sort], { ascending: dir === "asc" })
+      .range(from, to);
+    customers = (data ?? []) as Customer[];
+    total = count ?? 0;
+    overdueSet = await fetchOverdueSet(customers.map((c) => c.id));
+  }
+
+  const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
   if (customers.length === 0 && total > 0 && page > totalPages) {
     redirect(buildHref({ page: String(totalPages) }));
   }
 
-  // Per-customer credit status for the rows on this page. One batch query for who
-  // has qualifying overdue invoices — same canonical rule as getOverdueInvoices:
-  // status 'overdue' OR unpaid-and-past-due, with no payment in flight.
-  const today = businessToday();
-  const pageIds = customers.map((c) => c.id);
-  const overdueSet = new Set<string>();
-  if (pageIds.length > 0) {
-    const { data: overdueRows } = await admin
-      .from("invoices")
-      .select("customer_id")
-      .in("customer_id", pageIds)
-      .or(`status.eq.overdue,and(status.eq.unpaid,due_date.lt.${today})`)
-      .is("stripe_payment_id", null);
-    for (const r of overdueRows ?? []) overdueSet.add(r.customer_id as string);
-  }
-  const creditStatusFor = (c: Customer): "current" | "override" | "stop" =>
-    creditOverrideActive(c.credit_hold_override_until)
-      ? "override"
-      : overdueSet.has(c.id)
-        ? "stop"
-        : "current";
+  const creditStatusFor = (c: Customer): CreditStatus =>
+    statusOf(c, overdueSet);
 
   return (
     <div className="space-y-8">
@@ -195,7 +233,7 @@ export default async function AdminCustomersPage({
             <thead className="text-xs uppercase tracking-wide text-stone-500">
               <tr className="border-b border-stone-200">
                 <SortableHeader column="business" label="Business" sort={sort} dir={dir} basePath="/admin/customers" defaultDir="asc" extraParams={listParams} />
-                <th className="px-6 py-3">Credit</th>
+                <SortableHeader column="credit" label="Credit" sort={sort} dir={dir} basePath="/admin/customers" defaultDir="asc" extraParams={listParams} />
                 <SortableHeader column="contact" label="Contact" sort={sort} dir={dir} basePath="/admin/customers" defaultDir="asc" extraParams={listParams} />
                 <SortableHeader column="email" label="Email" sort={sort} dir={dir} basePath="/admin/customers" defaultDir="asc" extraParams={listParams} />
                 <th className="px-6 py-3">Phone</th>
