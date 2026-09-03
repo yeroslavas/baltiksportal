@@ -5,7 +5,8 @@ import { formatPhone } from "@/lib/format";
 import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/pagination";
 import { SortableHeader, type SortDir } from "@/components/sortable-header";
 import { businessToday } from "@/lib/standing-orders";
-import { CreditOverrideBadge } from "@/components/credit-override-badge";
+import { creditOverrideActive } from "@/lib/invoices";
+import { CreditStatusTag } from "@/components/credit-status-tag";
 import type { Customer } from "@/lib/types";
 import { CreateCustomerForm } from "./create-customer-form";
 import { ResetPasswordForm } from "./reset-password-form";
@@ -86,6 +87,28 @@ export default async function AdminCustomersPage({
   if (customers.length === 0 && total > 0 && page > totalPages) {
     redirect(buildHref({ page: String(totalPages) }));
   }
+
+  // Per-customer credit status for the rows on this page. One batch query for who
+  // has qualifying overdue invoices — same canonical rule as getOverdueInvoices:
+  // status 'overdue' OR unpaid-and-past-due, with no payment in flight.
+  const today = businessToday();
+  const pageIds = customers.map((c) => c.id);
+  const overdueSet = new Set<string>();
+  if (pageIds.length > 0) {
+    const { data: overdueRows } = await admin
+      .from("invoices")
+      .select("customer_id")
+      .in("customer_id", pageIds)
+      .or(`status.eq.overdue,and(status.eq.unpaid,due_date.lt.${today})`)
+      .is("stripe_payment_id", null);
+    for (const r of overdueRows ?? []) overdueSet.add(r.customer_id as string);
+  }
+  const creditStatusFor = (c: Customer): "current" | "override" | "stop" =>
+    creditOverrideActive(c.credit_hold_override_until)
+      ? "override"
+      : overdueSet.has(c.id)
+        ? "stop"
+        : "current";
 
   return (
     <div className="space-y-8">
@@ -168,10 +191,11 @@ export default async function AdminCustomersPage({
           </p>
         ) : (
           <div className="overflow-x-auto">
-          <table className="w-full min-w-[44rem] text-left text-sm">
+          <table className="w-full min-w-[52rem] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-stone-500">
               <tr className="border-b border-stone-200">
                 <SortableHeader column="business" label="Business" sort={sort} dir={dir} basePath="/admin/customers" defaultDir="asc" extraParams={listParams} />
+                <th className="px-6 py-3">Credit</th>
                 <SortableHeader column="contact" label="Contact" sort={sort} dir={dir} basePath="/admin/customers" defaultDir="asc" extraParams={listParams} />
                 <SortableHeader column="email" label="Email" sort={sort} dir={dir} basePath="/admin/customers" defaultDir="asc" extraParams={listParams} />
                 <th className="px-6 py-3">Phone</th>
@@ -182,13 +206,13 @@ export default async function AdminCustomersPage({
               {customers.map((c) => (
                 <tr key={c.id} className="border-b border-stone-100 last:border-0">
                   <td className="px-6 py-3 font-medium text-stone-900">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span>{c.business_name}</span>
-                      <CreditOverrideBadge
-                        until={c.credit_hold_override_until}
-                        reason={c.credit_hold_override_reason}
-                      />
-                    </div>
+                    {c.business_name}
+                  </td>
+                  <td className="px-6 py-3">
+                    <CreditStatusTag
+                      status={creditStatusFor(c)}
+                      until={c.credit_hold_override_until}
+                    />
                   </td>
                   <td className="px-6 py-3 text-stone-600">
                     {c.contact_name ?? "—"}
