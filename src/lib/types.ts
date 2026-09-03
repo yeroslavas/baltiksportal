@@ -22,6 +22,9 @@ export type Customer = {
   // Negotiated per-dozen charge added when this customer orders a sliceable
   // item sliced (0 = no slice fee). See products.allow_slicing.
   slice_fee: number;
+  // Time-boxed credit-hold override ("YYYY-MM-DD" or null): while today or later,
+  // the customer may order despite overdue invoices (admin-granted; auto-expires).
+  credit_hold_override_until: string | null;
   created_at: string;
 };
 

@@ -54,6 +54,17 @@ export async function generateStandingOrders(
       (overdueRows ?? []).map((r) => r.customer_id),
     );
 
+    // Time-boxed admin override: customers explicitly allowed to keep ordering
+    // despite overdue invoices (credit_hold_override_until >= today) are NOT
+    // locked. Mirrors creditOverrideActive() / the checkout gate.
+    if (lockedCustomers.size > 0) {
+      const { data: overridden } = await admin
+        .from("customers")
+        .select("id")
+        .gte("credit_hold_override_until", today);
+      for (const r of overridden ?? []) lockedCustomers.delete(r.id);
+    }
+
     const { data: itemData } = await admin
       .from("standing_order_items")
       .select("*")

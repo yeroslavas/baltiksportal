@@ -5,7 +5,7 @@ import { getUser, isAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createOrderForCustomer, priceOrder } from "@/lib/orders";
 import { getSettings } from "@/lib/settings";
-import { getOverdueInvoices } from "@/lib/invoices";
+import { getOverdueInvoices, creditOverrideActive } from "@/lib/invoices";
 import { earliestFulfillmentDate } from "@/lib/order-cutoff";
 import { isoWeekday } from "@/lib/standing-orders";
 import { getStripe } from "@/lib/stripe";
@@ -92,20 +92,25 @@ export async function placeOrder(
   const admin = createAdminClient();
   const { data: customer } = await admin
     .from("customers")
-    .select("id, allow_invoicing, email")
+    .select("id, allow_invoicing, email, credit_hold_override_until")
     .eq("user_id", user.id)
     .maybeSingle<{
       id: string;
       allow_invoicing: boolean;
       email: string | null;
+      credit_hold_override_until: string | null;
     }>();
   if (!customer) {
     return { error: "No customer profile is linked to your account." };
   }
 
   // Credit lock: a customer with past-due invoices can't place new orders until
-  // they're paid (admins exempt). Unlock = pay them on the Invoices page.
-  if (!isAdmin(user.email)) {
+  // they're paid (admins exempt). Unlock = pay them on the Invoices page, or an
+  // admin grants a time-boxed credit-hold override on the customer.
+  if (
+    !isAdmin(user.email) &&
+    !creditOverrideActive(customer.credit_hold_override_until)
+  ) {
     const overdue = await getOverdueInvoices(customer.id, admin);
     if (overdue.length > 0) {
       const owed = overdue.reduce((s, i) => s + Number(i.total_amount), 0);

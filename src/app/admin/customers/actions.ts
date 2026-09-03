@@ -223,6 +223,12 @@ export async function updateCustomer(
     return { error: "Slice fee must be a number of 0 or more.", success: null };
   }
 
+  // Time-boxed credit-hold override date (optional). Empty = no override.
+  const creditOverride = get("credit_hold_override_until");
+  if (creditOverride && !/^\d{4}-\d{2}-\d{2}$/.test(creditOverride)) {
+    return { error: "Credit-hold override must be a valid date.", success: null };
+  }
+
   const admin = createAdminClient();
 
   // Need user_id (for the login) and the current email (to detect a change).
@@ -268,6 +274,7 @@ export async function updateCustomer(
       allow_invoicing: formData.get("allow_invoicing") === "on",
       invoice_terms_days: termsDays,
       slice_fee: Math.round(sliceFee * 100) / 100,
+      credit_hold_override_until: creditOverride || null,
     })
     .eq("id", id);
   if (updateError) return { error: updateError.message, success: null };

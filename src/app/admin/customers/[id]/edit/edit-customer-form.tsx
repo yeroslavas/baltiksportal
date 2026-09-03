@@ -178,6 +178,23 @@ export function EditCustomerForm({
         </label>
       </div>
 
+      <div className="flex flex-col gap-1.5 sm:col-span-2">
+        <label className="text-sm font-medium text-stone-700">
+          Keep ordering despite overdue — until
+        </label>
+        <input
+          name="credit_hold_override_until"
+          type="date"
+          defaultValue={customer.credit_hold_override_until ?? ""}
+          className={inputClass}
+        />
+        <p className="text-xs text-stone-500">
+          Temporary credit-hold override. While set to today or a future date,
+          this customer can place orders even with overdue invoices. Leave blank
+          for the normal hold; it auto-expires after this date.
+        </p>
+      </div>
+
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-stone-700">
           Payment terms (days)
