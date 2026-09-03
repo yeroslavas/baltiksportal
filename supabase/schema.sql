@@ -31,6 +31,10 @@ create table if not exists public.customers (
   autopay_payment_method_id text,
   autopay_bank_last4 text,
   autopay_fail_count integer not null default 0,
+  -- Time-boxed credit-hold override: while this date is today or later, the
+  -- customer may place orders despite overdue invoices (admin-granted; auto-
+  -- expires). NULL = normal credit stop applies.
+  credit_hold_override_until date,
   created_at    timestamptz not null default now()
 );
 
@@ -57,6 +61,9 @@ alter table public.customers add column if not exists slice_fee numeric(10,2) no
 -- Move the standard rate to 1.20 for existing installs (add-column above won't
 -- change a pre-existing column's default).
 alter table public.customers alter column slice_fee set default 1.20;
+-- Time-boxed credit-hold override (no-op on fresh installs). Internal/admin-only
+-- (deliberately NOT added to the customer SELECT grant below).
+alter table public.customers add column if not exists credit_hold_override_until date;
 
 -- Products: the catalog. base_price applies unless a customer override exists.
 -- name/description/unit/base_price are customer-facing; sku + the report_*/

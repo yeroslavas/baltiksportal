@@ -131,3 +131,12 @@ export async function getOverdueInvoices(
     .order("due_date");
   return data ?? [];
 }
+
+// True when an admin has granted a time-boxed override letting this customer
+// keep placing orders despite overdue invoices. The override date is inclusive
+// (valid through that whole day) and compared in the business timezone. Drives
+// the checkout gate, the standing-order generator, and the softened banner —
+// keeping the "keep orders flowing" decision in one canonical place.
+export function creditOverrideActive(overrideUntil: string | null): boolean {
+  return !!overrideUntil && overrideUntil >= businessToday();
+}
