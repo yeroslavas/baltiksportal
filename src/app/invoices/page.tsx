@@ -81,8 +81,9 @@ export default async function InvoicesPage({
           <div className="mt-4 rounded-2xl border border-green-200 bg-green-50 px-5 py-4 text-sm text-green-800">
             <p className="font-semibold">Thank you — your payment was submitted.</p>
             <p>
-              Bank (ACH) transfers can take a few business days to clear. Paid
-              invoices update here once confirmed.
+              Card payments confirm right away; bank (ACH) transfers can take a
+              few business days to clear. Paid invoices update here once
+              confirmed.
             </p>
           </div>
         ) : null}
