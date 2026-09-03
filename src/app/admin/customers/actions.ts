@@ -195,7 +195,7 @@ export async function updateCustomer(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  const adminUser = await requireAdmin();
 
   const get = (k: string) => String(formData.get(k) ?? "").trim();
   const id = get("id");
@@ -223,21 +223,55 @@ export async function updateCustomer(
     return { error: "Slice fee must be a number of 0 or more.", success: null };
   }
 
-  // Time-boxed credit-hold override date (optional). Empty = no override.
+  // Time-boxed credit-hold override date + reason (both optional). Empty = none.
   const creditOverride = get("credit_hold_override_until");
   if (creditOverride && !/^\d{4}-\d{2}-\d{2}$/.test(creditOverride)) {
     return { error: "Credit-hold override must be a valid date.", success: null };
   }
+  const overrideReason = get("credit_hold_override_reason").slice(0, 300);
 
   const admin = createAdminClient();
 
-  // Need user_id (for the login) and the current email (to detect a change).
+  // Need user_id + current email (to detect a login change), and the current
+  // override date/reason (to decide whether to re-stamp the audit trail).
   const { data: existing } = await admin
     .from("customers")
-    .select("user_id,email")
+    .select(
+      "user_id,email,credit_hold_override_until,credit_hold_override_reason",
+    )
     .eq("id", id)
-    .maybeSingle<{ user_id: string; email: string | null }>();
+    .maybeSingle<{
+      user_id: string;
+      email: string | null;
+      credit_hold_override_until: string | null;
+      credit_hold_override_reason: string | null;
+    }>();
   if (!existing) return { error: "Customer not found.", success: null };
+
+  // Credit-hold override audit: stamp who/when only when it's newly granted or
+  // changed; clear the whole trail when removed; otherwise leave the original
+  // stamp intact so an unrelated save doesn't rewrite it.
+  const overrideChanged =
+    creditOverride !== (existing.credit_hold_override_until ?? "") ||
+    overrideReason !== (existing.credit_hold_override_reason ?? "");
+  const overrideFields = !creditOverride
+    ? {
+        credit_hold_override_until: null,
+        credit_hold_override_reason: null,
+        credit_hold_override_set_by: null,
+        credit_hold_override_set_at: null,
+      }
+    : overrideChanged
+      ? {
+          credit_hold_override_until: creditOverride,
+          credit_hold_override_reason: overrideReason || null,
+          credit_hold_override_set_by: adminUser.email ?? null,
+          credit_hold_override_set_at: new Date().toISOString(),
+        }
+      : {
+          credit_hold_override_until: creditOverride,
+          credit_hold_override_reason: overrideReason || null,
+        };
 
   // If the login email changed, update the auth user. The account, its pricing,
   // and its history all stay — only the sign-in credential changes.
@@ -274,7 +308,7 @@ export async function updateCustomer(
       allow_invoicing: formData.get("allow_invoicing") === "on",
       invoice_terms_days: termsDays,
       slice_fee: Math.round(sliceFee * 100) / 100,
-      credit_hold_override_until: creditOverride || null,
+      ...overrideFields,
     })
     .eq("id", id);
   if (updateError) return { error: updateError.message, success: null };

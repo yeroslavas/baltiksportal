@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPhone } from "@/lib/format";
 import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/pagination";
 import { SortableHeader, type SortDir } from "@/components/sortable-header";
+import { businessToday } from "@/lib/standing-orders";
+import { CreditOverrideBadge } from "@/components/credit-override-badge";
 import type { Customer } from "@/lib/types";
 import { CreateCustomerForm } from "./create-customer-form";
 import { ResetPasswordForm } from "./reset-password-form";
@@ -22,6 +24,7 @@ export default async function AdminCustomersPage({
     sort?: string;
     dir?: string;
     q?: string;
+    override?: string;
   }>;
 }) {
   const {
@@ -29,11 +32,13 @@ export default async function AdminCustomersPage({
     sort: sortParam,
     dir: dirParam,
     q: qParam,
+    override: overrideParam,
   } = await searchParams;
   const page = Math.max(1, Math.floor(Number(pageParam)) || 1);
   const sort = sortParam && SORTS[sortParam] ? sortParam : "business";
   const dir: SortDir = dirParam === "desc" ? "desc" : "asc";
   const q = (qParam ?? "").trim().slice(0, 80);
+  const overrideOnly = overrideParam === "1";
   // Sanitize for a PostgREST or() filter — strip chars that break its grammar.
   const safeQ = q.replace(/[,()*%\\]/g, "");
 
@@ -44,6 +49,7 @@ export default async function AdminCustomersPage({
       sort: sort !== "business" ? sort : undefined,
       dir: dir !== "asc" ? dir : undefined,
       q: q || undefined,
+      override: overrideOnly ? "1" : undefined,
       ...overrides,
     };
     const p = new URLSearchParams();
@@ -51,7 +57,10 @@ export default async function AdminCustomersPage({
     const s = p.toString();
     return s ? `/admin/customers?${s}` : "/admin/customers";
   };
-  const listParams: Record<string, string | undefined> = { q: q || undefined };
+  const listParams: Record<string, string | undefined> = {
+    q: q || undefined,
+    override: overrideOnly ? "1" : undefined,
+  };
 
   const admin = createAdminClient();
   const from = (page - 1) * DEFAULT_PAGE_SIZE;
@@ -64,6 +73,10 @@ export default async function AdminCustomersPage({
     query = query.or(
       `business_name.ilike.*${safeQ}*,contact_name.ilike.*${safeQ}*,email.ilike.*${safeQ}*`,
     );
+  }
+  // Active credit-hold overrides only: override date today or later.
+  if (overrideOnly) {
+    query = query.gte("credit_hold_override_until", businessToday());
   }
   const { data, count } = await query.range(from, to);
   const customers = (data ?? []) as Customer[];
@@ -121,18 +134,37 @@ export default async function AdminCustomersPage({
             Clear
           </a>
         ) : null}
+        <Link
+          href={buildHref({ override: overrideOnly ? undefined : "1" })}
+          className={`inline-flex items-center rounded-full border px-3 py-2 text-sm font-medium transition ${
+            overrideOnly
+              ? "border-amber-500 bg-amber-500 text-white"
+              : "border-stone-300 bg-white text-stone-600 hover:bg-stone-100"
+          }`}
+        >
+          {overrideOnly ? "✓ Active credit overrides" : "Active credit overrides"}
+        </Link>
       </form>
 
       <section className="rounded-2xl border border-stone-200 bg-white shadow-sm">
         <h2 className="border-b border-stone-200 px-6 py-4 font-semibold text-stone-900">
-          {q ? "Matching customers" : "All customers"} ({total})
+          {overrideOnly
+            ? "Active credit overrides"
+            : q
+              ? "Matching customers"
+              : "All customers"}{" "}
+          ({total})
           {q ? (
             <span className="font-normal text-stone-500"> · “{q}”</span>
           ) : null}
         </h2>
         {total === 0 ? (
           <p className="px-6 py-8 text-sm text-stone-500">
-            {q ? "No customers match your search." : "No customers yet."}
+            {overrideOnly
+              ? "No customers have an active credit-hold override."
+              : q
+                ? "No customers match your search."
+                : "No customers yet."}
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -150,7 +182,13 @@ export default async function AdminCustomersPage({
               {customers.map((c) => (
                 <tr key={c.id} className="border-b border-stone-100 last:border-0">
                   <td className="px-6 py-3 font-medium text-stone-900">
-                    {c.business_name}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span>{c.business_name}</span>
+                      <CreditOverrideBadge
+                        until={c.credit_hold_override_until}
+                        reason={c.credit_hold_override_reason}
+                      />
+                    </div>
                   </td>
                   <td className="px-6 py-3 text-stone-600">
                     {c.contact_name ?? "—"}
