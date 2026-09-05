@@ -122,6 +122,62 @@ function DonutChart({
     </div>
   );
 }
+
+// Vertical bar chart of a per-weekday average (Mon…Sun). Shared by the bagels
+// and dollars charts — only the data, bar color, and value format differ.
+function WeekdayBars({
+  title,
+  data,
+  max,
+  colorClass,
+  formatValue,
+  footnote,
+}: {
+  title: string;
+  data: { label: string; avg: number }[];
+  max: number;
+  colorClass: string;
+  formatValue: (n: number) => string;
+  footnote: string;
+}) {
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-stone-700">{title}</h3>
+      <div className="mt-3 flex h-40 items-end gap-2 border-b border-stone-200">
+        {data.map((w) => {
+          // Pixel height (not %) so bars render regardless of flex sizing.
+          const px = w.avg > 0 ? Math.max(4, Math.round((w.avg / max) * 140)) : 0;
+          return (
+            <div
+              key={w.label}
+              className="flex flex-1 flex-col items-center justify-end gap-1"
+            >
+              <span className="text-xs font-medium text-stone-600">
+                {formatValue(w.avg)}
+              </span>
+              <div
+                className={`w-full rounded-t ${colorClass}`}
+                style={{ height: `${px}px` }}
+                title={`${w.label}: ${formatValue(w.avg)}`}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-1 flex gap-2">
+        {data.map((w) => (
+          <div
+            key={w.label}
+            className="flex-1 text-center text-xs text-stone-400"
+          >
+            {w.label}
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-stone-400">{footnote}</p>
+    </div>
+  );
+}
 const slicerInput =
   "rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200";
 
@@ -133,6 +189,10 @@ export default async function AdminReportingPage({
   const { from, to } = await searchParams;
   const insights = await getInsights({ from, to });
   const maxWeekday = Math.max(1, ...insights.weekday.map((w) => w.avg));
+  const maxWeekdayDollars = Math.max(
+    1,
+    ...insights.weekdayDollars.map((w) => w.avg),
+  );
   const maxCustomer = Math.max(1, ...insights.topCustomers.map((c) => c.total));
 
   const configured = sheetsConfigured();
@@ -311,82 +371,56 @@ export default async function AdminReportingPage({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div>
-            <h3 className="text-sm font-semibold text-stone-700">
-              Top 5 customers by volume
-            </h3>
-            {insights.topCustomers.length === 0 ? (
-              <p className="mt-2 text-sm text-stone-400">No orders in this range.</p>
-            ) : (
-              <ol className="mt-3 space-y-3">
-                {insights.topCustomers.map((c, i) => (
-                  <li key={c.name}>
-                    <div className="flex items-baseline justify-between gap-3 text-sm">
-                      <span className="min-w-0 truncate text-stone-700">
-                        <span className="mr-1 text-stone-400">{i + 1}.</span>
-                        {c.name}
-                      </span>
-                      <span className="shrink-0 font-semibold text-stone-900">
-                        {formatPrice(c.total)}
-                      </span>
-                    </div>
-                    <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-stone-100">
-                      <div
-                        className="h-full rounded-full bg-brand-500"
-                        style={{
-                          width: `${Math.max(2, Math.round((c.total / maxCustomer) * 100))}%`,
-                        }}
-                      />
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </div>
-
-          <div>
-            <h3 className="text-sm font-semibold text-stone-700">
-              Avg bagels delivered per weekday
-            </h3>
-            <div className="mt-3 flex h-40 items-end gap-2 border-b border-stone-200">
-              {insights.weekday.map((w) => {
-                // Pixel height (not %) so bars render regardless of flex sizing.
-                const px =
-                  w.avg > 0
-                    ? Math.max(4, Math.round((w.avg / maxWeekday) * 140))
-                    : 0;
-                return (
-                  <div
-                    key={w.label}
-                    className="flex flex-1 flex-col items-center justify-end gap-1"
-                  >
-                    <span className="text-xs font-medium text-stone-600">
-                      {w.avg.toLocaleString()}
+        <div>
+          <h3 className="text-sm font-semibold text-stone-700">
+            Top 5 customers by volume
+          </h3>
+          {insights.topCustomers.length === 0 ? (
+            <p className="mt-2 text-sm text-stone-400">No orders in this range.</p>
+          ) : (
+            <ol className="mt-3 space-y-3">
+              {insights.topCustomers.map((c, i) => (
+                <li key={c.name}>
+                  <div className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className="min-w-0 truncate text-stone-700">
+                      <span className="mr-1 text-stone-400">{i + 1}.</span>
+                      {c.name}
                     </span>
+                    <span className="shrink-0 font-semibold text-stone-900">
+                      {formatPrice(c.total)}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-stone-100">
                     <div
-                      className="w-full rounded-t bg-brand-500"
-                      style={{ height: `${px}px` }}
-                      title={`${w.label}: ${w.avg.toLocaleString()}`}
+                      className="h-full rounded-full bg-brand-500"
+                      style={{
+                        width: `${Math.max(2, Math.round((c.total / maxCustomer) * 100))}%`,
+                      }}
                     />
                   </div>
-                );
-              })}
-            </div>
-            <div className="mt-1 flex gap-2">
-              {insights.weekday.map((w) => (
-                <div
-                  key={w.label}
-                  className="flex-1 text-center text-xs text-stone-400"
-                >
-                  {w.label}
-                </div>
+                </li>
               ))}
-            </div>
-            <p className="mt-2 text-xs text-stone-400">
-              Average per delivery day on that weekday, within the selected range.
-            </p>
-          </div>
+            </ol>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <WeekdayBars
+            title="Avg bagels delivered per weekday"
+            data={insights.weekday}
+            max={maxWeekday}
+            colorClass="bg-brand-500"
+            formatValue={(n) => n.toLocaleString()}
+            footnote="Average per delivery day on that weekday, within the selected range."
+          />
+          <WeekdayBars
+            title="Avg $ delivered per weekday"
+            data={insights.weekdayDollars}
+            max={maxWeekdayDollars}
+            colorClass="bg-emerald-500"
+            formatValue={(n) => `$${Math.round(n).toLocaleString()}`}
+            footnote="Average $ per delivery day on that weekday, within the selected range."
+          />
         </div>
 
         <div className="border-t border-stone-100 pt-5">
