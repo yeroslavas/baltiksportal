@@ -72,7 +72,8 @@ export type Insights = {
   revenueTotal: number;
   orderCount: number;
   topCustomers: { name: string; total: number }[];
-  weekday: { label: string; avg: number }[]; // Mon … Sun
+  weekday: { label: string; avg: number }[]; // avg bagels per weekday, Mon … Sun
+  weekdayDollars: { label: string; avg: number }[]; // avg $ per weekday, Mon … Sun
   revenueBreakdown: { label: string; value: number }[]; // Dozens, Packs, CC, Fees
   channelBreakdown: { label: string; value: number }[]; // Foodservice, Retail
 };
@@ -111,8 +112,10 @@ export async function getInsights(opts: {
     { total: number; customer: string; deliveryFee: number }
   >();
   let bagelsTotal = 0;
-  const weekdayUnits = new Array(8).fill(0); // index by ISO weekday 1..7
+  const weekdayUnits = new Array(8).fill(0); // bagels, index by ISO weekday 1..7
   const weekdayDays: Array<Set<string>> = Array.from({ length: 8 }, () => new Set());
+  const weekdayRevenue = new Array(8).fill(0); // order $ by ISO weekday 1..7
+  const weekdayRevenueDays: Array<Set<string>> = Array.from({ length: 8 }, () => new Set());
   const rev = { dozens: 0, packs: 0, creamCheese: 0 };
   const chan = { foodservice: 0, retail: 0 };
 
@@ -128,6 +131,10 @@ export async function getInsights(opts: {
         customer: o.customers?.business_name ?? "—",
         deliveryFee: Number(o.delivery_fee) || 0,
       });
+      // Bucket the order's $ by its delivery weekday (once per order).
+      const wd = isoWeekday(dd);
+      weekdayRevenue[wd] += Number(o.total_amount) || 0;
+      weekdayRevenueDays[wd].add(dd);
     }
 
     const p = r.products;
@@ -165,6 +172,11 @@ export async function getInsights(opts: {
     const days = weekdayDays[wd].size;
     return { label, avg: days > 0 ? Math.round(weekdayUnits[wd] / days) : 0 };
   });
+  const weekdayDollars = WEEKDAY_LABELS.map((label, idx) => {
+    const wd = idx + 1;
+    const days = weekdayRevenueDays[wd].size;
+    return { label, avg: days > 0 ? round2(weekdayRevenue[wd] / days) : 0 };
+  });
 
   return {
     from,
@@ -174,6 +186,7 @@ export async function getInsights(opts: {
     orderCount: orders.size,
     topCustomers,
     weekday,
+    weekdayDollars,
     revenueBreakdown: [
       { label: "Dozens", value: round2(rev.dozens) },
       { label: "Packs", value: round2(rev.packs) },
