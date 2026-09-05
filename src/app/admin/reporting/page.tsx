@@ -140,9 +140,23 @@ function WeekdayBars({
   formatValue: (n: number) => string;
   footnote: string;
 }) {
+  // Sum of the per-weekday averages ≈ what a typical full week totals (distinct
+  // from the range-total tiles above, which sum the whole selected period).
+  const weekTotal = data.reduce((s, w) => s + w.avg, 0);
   return (
     <div>
-      <h3 className="text-sm font-semibold text-stone-700">{title}</h3>
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="text-sm font-semibold text-stone-700">{title}</h3>
+        <span
+          className="shrink-0 text-xs text-stone-500"
+          title="Sum of the daily averages — a typical full week"
+        >
+          Avg week:{" "}
+          <span className="font-semibold text-stone-700">
+            {formatValue(weekTotal)}
+          </span>
+        </span>
+      </div>
       <div className="mt-3 flex h-40 items-end gap-2 border-b border-stone-200">
         {data.map((w) => {
           // Pixel height (not %) so bars render regardless of flex sizing.
