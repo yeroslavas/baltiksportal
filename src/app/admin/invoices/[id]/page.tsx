@@ -79,7 +79,11 @@ export default async function AdminInvoiceDetailPage({
             {invoice.status === "canceled" ? (
               <InvoiceStatusBadge status={invoice.status} />
             ) : (
-              <InvoiceStatusForm id={invoice.id} status={invoice.status} />
+              <InvoiceStatusForm
+                id={invoice.id}
+                status={invoice.status}
+                checkMailedAt={invoice.check_mailed_at}
+              />
             )}
             <a
               href={`/invoices/${invoice.id}/pdf`}

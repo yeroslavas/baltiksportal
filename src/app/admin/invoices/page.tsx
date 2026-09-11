@@ -54,6 +54,7 @@ const FILTER_TABS = [
   { key: "outstanding", label: "Outstanding" },
   { key: "overdue", label: "Overdue" },
   { key: "processing", label: "Processing" },
+  { key: "check_mailed", label: "Check Mailed" },
   { key: "declined", label: "Declined" },
   { key: "incomplete", label: "Incomplete" },
   { key: "paid", label: "Paid" },
@@ -136,6 +137,7 @@ export default async function AdminInvoicesPage({
       dataQuery = dataQuery
         .eq("status", "overdue")
         .is("stripe_payment_id", null)
+        .is("check_mailed_at", null)
         .or(
           "payment_note.is.null,and(payment_note.not.ilike.⚠*,payment_note.not.ilike.⏳*)",
         );
@@ -145,16 +147,24 @@ export default async function AdminInvoicesPage({
         .in("status", ["unpaid", "overdue"])
         .not("stripe_payment_id", "is", null);
       break;
+    case "check_mailed":
+      dataQuery = dataQuery
+        .in("status", ["unpaid", "overdue"])
+        .is("stripe_payment_id", null)
+        .not("check_mailed_at", "is", null);
+      break;
     case "declined":
       dataQuery = dataQuery
         .in("status", ["unpaid", "overdue"])
         .is("stripe_payment_id", null)
+        .is("check_mailed_at", null)
         .ilike("payment_note", "⚠%");
       break;
     case "incomplete":
       dataQuery = dataQuery
         .in("status", ["unpaid", "overdue"])
         .is("stripe_payment_id", null)
+        .is("check_mailed_at", null)
         .ilike("payment_note", "⏳%");
       break;
     case "paid":
@@ -178,6 +188,7 @@ export default async function AdminInvoicesPage({
         cq = cq
           .eq("status", "overdue")
           .is("stripe_payment_id", null)
+          .is("check_mailed_at", null)
           .or(
             "payment_note.is.null,and(payment_note.not.ilike.⚠*,payment_note.not.ilike.⏳*)",
           );
@@ -187,16 +198,24 @@ export default async function AdminInvoicesPage({
           .in("status", ["unpaid", "overdue"])
           .not("stripe_payment_id", "is", null);
         break;
+      case "check_mailed":
+        cq = cq
+          .in("status", ["unpaid", "overdue"])
+          .is("stripe_payment_id", null)
+          .not("check_mailed_at", "is", null);
+        break;
       case "declined":
         cq = cq
           .in("status", ["unpaid", "overdue"])
           .is("stripe_payment_id", null)
+          .is("check_mailed_at", null)
           .ilike("payment_note", "⚠%");
         break;
       case "incomplete":
         cq = cq
           .in("status", ["unpaid", "overdue"])
           .is("stripe_payment_id", null)
+          .is("check_mailed_at", null)
           .ilike("payment_note", "⏳%");
         break;
       case "paid":
@@ -484,7 +503,11 @@ export default async function AdminInvoicesPage({
                         {/* Canceled is set only by canceling the order, so it's
                             not hand-editable here (see INVOICE_STATUSES). */}
                         {inv.status !== "canceled" ? (
-                          <InvoiceStatusForm id={inv.id} status={inv.status} />
+                          <InvoiceStatusForm
+                            id={inv.id}
+                            status={inv.status}
+                            checkMailedAt={inv.check_mailed_at}
+                          />
                         ) : null}
                       </div>
                     </td>

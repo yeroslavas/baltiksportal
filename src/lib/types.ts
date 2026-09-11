@@ -150,6 +150,13 @@ export type InvoiceStatus = "unpaid" | "paid" | "overdue" | "canceled";
 // only when its order is canceled, so it's excluded here.
 export const INVOICE_STATUSES: InvoiceStatus[] = ["unpaid", "paid", "overdue"];
 
+// The admin status control offers this alongside the real statuses, but it is
+// NOT one: it flags that the customer says a check is in the mail, setting
+// invoices.check_mailed_at while the stored status stays unpaid/overdue. Lives
+// here rather than in the actions module because a "use server" file may only
+// export async functions.
+export const CHECK_MAILED_OPTION = "check_mailed";
+
 export type Invoice = {
   id: string;
   invoice_number: string; // human-readable, e.g. "INV-0001"
@@ -168,5 +175,9 @@ export type Invoice = {
   payment_note: string | null;
   // Stripe PaymentIntent id when paid online (reference back to the transaction).
   stripe_payment_id: string | null;
+  // Set when the customer reports a check is in the mail. Lifts the credit stop
+  // like an in-flight payment, and never expires on its own — cleared only by
+  // marking the invoice paid or choosing another status.
+  check_mailed_at: string | null;
   created_at: string;
 };

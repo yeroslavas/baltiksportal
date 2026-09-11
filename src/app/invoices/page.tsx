@@ -124,6 +124,7 @@ export default async function InvoicesPage({
                 status: inv.status,
                 stripe_payment_id: inv.stripe_payment_id,
                 payment_note: inv.payment_note,
+                check_mailed_at: inv.check_mailed_at,
                 due_date: inv.due_date,
                 order_date: inv.orders?.order_date ?? null,
               }))}

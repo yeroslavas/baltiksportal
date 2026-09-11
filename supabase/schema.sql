@@ -551,6 +551,13 @@ create table if not exists public.invoices (
   payment_note   text,
   -- Stripe PaymentIntent id when paid online.
   stripe_payment_id text,
+  -- Set when the customer says a check is in the mail but it hasn't arrived.
+  -- Lifts the credit stop the same way an in-flight Stripe payment does (see
+  -- getOverdueInvoices), and is deliberately OPEN-ENDED: it never expires on its
+  -- own, so it is cleared only by marking the invoice paid or by picking another
+  -- status. The timestamp is what makes a forgotten tag visible (the badge and
+  -- the "Check Mailed" filter tab show how long it has been waiting).
+  check_mailed_at timestamptz,
   created_at     timestamptz not null default now()
 );
 
@@ -562,6 +569,9 @@ alter table public.invoices add column if not exists payment_note text;
 -- Stripe PaymentIntent id, set when an invoice is paid online (paid_at already
 -- exists above). Reference back to the Stripe transaction.
 alter table public.invoices add column if not exists stripe_payment_id text;
+-- "Check is in the mail" tag (no-op on fresh installs). Nullable timestamp:
+-- non-null means we're waiting on a check the customer says they've sent.
+alter table public.invoices add column if not exists check_mailed_at timestamptz;
 -- Admin credit/adjustment columns (no-op on fresh installs).
 alter table public.invoices add column if not exists credit_amount numeric(10,2) not null default 0 check (credit_amount >= 0);
 alter table public.invoices add column if not exists credit_reason text;

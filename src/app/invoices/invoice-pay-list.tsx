@@ -13,9 +13,10 @@ export type InvoiceListItem = {
   total_amount: number;
   amount_due: number; // total minus any admin credit
   status: InvoiceStatus;
-  // For the derived badge state (processing / declined / incomplete).
+  // For the derived badge state (processing / check mailed / declined / incomplete).
   stripe_payment_id: string | null;
   payment_note: string | null;
+  check_mailed_at: string | null;
   due_date: string;
   order_date: string | null;
 };

@@ -88,7 +88,7 @@ export default async function AdminCustomersPage({
 
   // Who has qualifying overdue invoices among the given customers — same canonical
   // rule as getOverdueInvoices (status 'overdue' OR unpaid-past-due, no payment in
-  // flight). Drives the credit-status tag.
+  // flight, no reported-mailed check). Drives the credit-status tag.
   const fetchOverdueSet = async (ids: string[]): Promise<Set<string>> => {
     const set = new Set<string>();
     if (ids.length === 0) return set;
@@ -97,7 +97,8 @@ export default async function AdminCustomersPage({
       .select("customer_id")
       .in("customer_id", ids)
       .or(`status.eq.overdue,and(status.eq.unpaid,due_date.lt.${today})`)
-      .is("stripe_payment_id", null);
+      .is("stripe_payment_id", null)
+      .is("check_mailed_at", null);
     for (const r of rows ?? []) set.add(r.customer_id as string);
     return set;
   };
