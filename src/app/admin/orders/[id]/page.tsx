@@ -5,7 +5,8 @@ import { OrderStatusForm } from "../order-status-form";
 import { CancelOrderButton } from "../cancel-order-button";
 import { reinstateOrder } from "../actions";
 import { GenerateInvoiceButton } from "../generate-invoice-button";
-import { FulfillmentInfo } from "@/components/fulfillment-info";
+import { EditFulfillmentForm } from "../edit-fulfillment-form";
+import { getSettings } from "@/lib/settings";
 import { StatusBadge } from "@/components/status-badge";
 import { StandingOrderBadge } from "@/components/standing-order-badge";
 import { InvoiceStatusBadge } from "@/components/invoice-status-badge";
@@ -53,6 +54,9 @@ export default async function AdminOrderDetailPage({
     .select("*")
     .eq("order_id", id);
   const items = (itemsData ?? []) as OrderItem[];
+
+  // Offered delivery/pickup windows, for the fulfillment editor's dropdown.
+  const settings = await getSettings();
 
   // The invoice auto-generated for this order (if any) — surfaces the admin
   // "generate it" path when one is somehow missing.
@@ -110,7 +114,10 @@ export default async function AdminOrderDetailPage({
         </p>
       </div>
 
-      <FulfillmentInfo order={order} />
+      <EditFulfillmentForm
+        order={order}
+        deliveryWindows={settings.deliveryWindows}
+      />
 
       <section className="rounded-2xl border border-stone-200 bg-white px-6 py-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
