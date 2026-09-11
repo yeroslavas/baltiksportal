@@ -128,6 +128,10 @@ export async function getOverdueInvoices(
     // is set while the invoice is still unpaid/overdue) lifts the credit stop on
     // authorization. If the ACH later fails, the webhook clears the tag → re-locks.
     .is("stripe_payment_id", null)
+    // A reported-mailed check lifts the stop the same way, on the customer's word
+    // rather than Stripe's. Unlike the ACH tag nothing clears this automatically,
+    // so it holds until an admin marks the invoice paid or picks another status.
+    .is("check_mailed_at", null)
     .order("due_date");
   return data ?? [];
 }

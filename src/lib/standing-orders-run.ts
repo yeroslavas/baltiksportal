@@ -48,8 +48,12 @@ export async function generateStandingOrders(
       .from("invoices")
       .select("customer_id")
       .or(`status.eq.overdue,and(status.eq.unpaid,due_date.lt.${today})`)
-      // In-flight payment (ACH authorized) lifts the stop on authorization too.
-      .is("stripe_payment_id", null);
+      // In-flight payment (ACH authorized) lifts the stop on authorization too,
+      // as does a reported-mailed check (check_mailed_at). Both must match
+      // getOverdueInvoices() exactly — divergence here silently changes who can
+      // order.
+      .is("stripe_payment_id", null)
+      .is("check_mailed_at", null);
     const lockedCustomers = new Set(
       (overdueRows ?? []).map((r) => r.customer_id),
     );

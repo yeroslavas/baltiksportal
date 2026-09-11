@@ -11,7 +11,11 @@ import {
 import { runAutopayCharges } from "@/lib/autopay-run";
 import { reconcilePaymentsInFlight } from "@/lib/reconcile";
 import { formatPrice } from "@/lib/format";
-import { INVOICE_STATUSES, type InvoiceStatus } from "@/lib/types";
+import {
+  INVOICE_STATUSES,
+  CHECK_MAILED_OPTION,
+  type InvoiceStatus,
+} from "@/lib/types";
 
 export type RunAutopayState = { message: string | null; error: string | null };
 
@@ -142,14 +146,53 @@ export async function applyCredit(
 
 // Set an invoice's status (the admin "mark as paid" control, plus the ability to
 // revert or force overdue). paid_at is stamped when paid and cleared otherwise.
+// The status control offers a fourth choice that isn't a stored status: marking
+// that the customer says a check is in the mail. That's a FLAG on a still-unpaid
+// invoice (check_mailed_at), not a status of its own — the invoice stays unpaid
+// or overdue underneath, and the money hasn't arrived. Modelling it as a flag
+// keeps the stored statuses honest and means the overdue sweep, totals, and
+// outstanding balances all keep treating it as owed.
+// (CHECK_MAILED_OPTION lives in lib/types: a "use server" file may only export
+// async functions.)
 export async function setInvoiceStatus(formData: FormData) {
   await requireAdmin();
 
   const id = String(formData.get("id") ?? "");
-  const status = String(formData.get("status") ?? "") as InvoiceStatus;
-  if (!id || !INVOICE_STATUSES.includes(status)) return;
+  const choice = String(formData.get("status") ?? "");
+  if (!id) return;
 
   const admin = createAdminClient();
+
+  if (choice === CHECK_MAILED_OPTION) {
+    // Only meaningful while the invoice is still owed. Stamped with "now" so the
+    // badge and filter tab can show how long we've been waiting — this tag never
+    // expires on its own, so visibility is the only guard against a forgotten one.
+    const { data: inv } = await admin
+      .from("invoices")
+      .select("status")
+      .eq("id", id)
+      .maybeSingle<{ status: string }>();
+    if (!inv || (inv.status !== "unpaid" && inv.status !== "overdue")) return;
+
+    await admin
+      .from("invoices")
+      .update({
+        check_mailed_at: new Date().toISOString(),
+        // A mailed check and a Stripe payment in flight are contradictory
+        // claims about the same money; the explicit admin action wins.
+        stripe_payment_id: null,
+      })
+      .eq("id", id);
+
+    revalidatePath("/admin/invoices");
+    revalidatePath(`/admin/invoices/${id}`);
+    revalidatePath("/admin/customers"); // credit-status column
+    return;
+  }
+
+  const status = choice as InvoiceStatus;
+  if (!INVOICE_STATUSES.includes(status)) return;
+
   await admin
     .from("invoices")
     .update({
@@ -158,11 +201,15 @@ export async function setInvoiceStatus(formData: FormData) {
       // Reverting off "paid" clears the Stripe tag, so the invoice isn't mistaken
       // for a payment-in-flight (which would skip the credit stop).
       ...(status !== "paid" ? { stripe_payment_id: null } : {}),
+      // Any explicit status choice ends the "waiting on a check" state: the check
+      // either arrived (paid) or the admin is putting the invoice back on stop.
+      check_mailed_at: null,
     })
     .eq("id", id);
 
   revalidatePath("/admin/invoices");
   revalidatePath(`/admin/invoices/${id}`);
+  revalidatePath("/admin/customers"); // credit-status column
 }
 
 export type NoteState = { saved: boolean };
