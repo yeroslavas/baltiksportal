@@ -9,6 +9,7 @@ import { RecomputeOverdueButton } from "./recompute-overdue-button";
 import { ReconcileButton } from "./reconcile-button";
 import { RunAutopayButton } from "./run-autopay-button";
 import { InvoiceDisplayBadge } from "@/components/invoice-display-badge";
+import { InvoiceStatusForm } from "./invoice-status-form";
 import { CreditOverrideBadge } from "@/components/credit-override-badge";
 import type { Invoice } from "@/lib/types";
 
@@ -478,7 +479,14 @@ export default async function AdminInvoicesPage({
                       {formatPrice(inv.total_amount)}
                     </td>
                     <td className="px-6 py-3">
-                      <InvoiceDisplayBadge inv={inv} />
+                      <div className="flex items-center gap-2">
+                        <InvoiceDisplayBadge inv={inv} />
+                        {/* Canceled is set only by canceling the order, so it's
+                            not hand-editable here (see INVOICE_STATUSES). */}
+                        {inv.status !== "canceled" ? (
+                          <InvoiceStatusForm id={inv.id} status={inv.status} />
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-6 py-3 text-right">
                       <Link
