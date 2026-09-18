@@ -61,6 +61,11 @@ export async function createInvoiceForOrder(opts: {
   const issueDate = businessToday();
   const dueDate = addDays(order?.delivery_date ?? issueDate, termsDays);
 
+  // A $0-total invoice has nothing to collect, so settle it on creation. This
+  // keeps free/comp orders (e.g. donation deliveries) from sitting unpaid and —
+  // worse — going "overdue" and tripping the credit stop over a $0 balance.
+  const settled = opts.total <= 0;
+
   // ON CONFLICT (order_id) DO NOTHING. ignoreDuplicates means an existing row
   // yields no returned row — which we report as "exists" rather than an error.
   const { data, error } = await admin
@@ -72,6 +77,13 @@ export async function createInvoiceForOrder(opts: {
         total_amount: opts.total,
         issue_date: issueDate,
         due_date: dueDate,
+        ...(settled
+          ? {
+              status: "paid",
+              paid_at: new Date().toISOString(),
+              payment_note: "Auto-settled — $0 balance",
+            }
+          : {}),
       },
       { onConflict: "order_id", ignoreDuplicates: true },
     )
