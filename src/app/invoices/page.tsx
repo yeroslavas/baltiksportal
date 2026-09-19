@@ -6,7 +6,23 @@ import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/pagination";
 import { InvoicePayList } from "./invoice-pay-list";
 import { AutopayCard } from "@/components/autopay-card";
 import { invoiceAmountDue } from "@/lib/invoices";
+import { invoiceDisplayRank } from "@/components/invoice-display-badge";
+import { SortSelect, type SortOption } from "@/components/sort-select";
 import type { Invoice } from "@/lib/types";
+
+// Sort choices offered in the "Sort by" dropdown. "newest" is the default and is
+// the only one paged in SQL; the rest rank in memory (see below).
+const SORT_OPTIONS: SortOption[] = [
+  { value: "newest", label: "Newest" },
+  { value: "status", label: "Status" },
+  { value: "due", label: "Due date" },
+  { value: "amount", label: "Amount" },
+];
+const SORT_KEYS = SORT_OPTIONS.map((o) => o.value);
+const DEFAULT_SORT = "newest";
+// Customer lists are per-account and small (tens of rows), so ranking the whole
+// set in memory is fine. Capped anyway so a runaway account can't fetch forever.
+const SORT_CAP = 500;
 
 // The invoice list joins each invoice's order to show the order date alongside
 // the due date (the order's placement is the date a customer recognizes).
@@ -17,6 +33,7 @@ export default async function InvoicesPage({
 }: {
   searchParams: Promise<{
     page?: string;
+    sort?: string;
     paid?: string;
     payerror?: string;
     autopay?: string;
@@ -25,12 +42,15 @@ export default async function InvoicesPage({
 }) {
   const {
     page: pageParam,
+    sort: sortParam,
     paid,
     payerror,
     autopay,
     autopayerror,
   } = await searchParams;
   const page = Math.max(1, Math.floor(Number(pageParam)) || 1);
+  const sort =
+    sortParam && SORT_KEYS.includes(sortParam) ? sortParam : DEFAULT_SORT;
 
   const user = await requireUser();
   const supabase = await createClient();
@@ -47,18 +67,46 @@ export default async function InvoicesPage({
   // RLS limits this to the signed-in customer's own invoices.
   const from = (page - 1) * DEFAULT_PAGE_SIZE;
   const to = from + DEFAULT_PAGE_SIZE - 1;
-  const { data, count } = await supabase
+
+  // "Status" and "Amount" aren't sortable in SQL: the badge state is derived
+  // (status + Stripe tag + note markers + check_mailed_at) and the amount shown
+  // is total minus credit. Ordering on the raw columns would group something
+  // other than what's on screen — the bug we hit on the admin list. So for those
+  // we pull the set and rank it with the very functions that render it.
+  const inMemory = sort === "status" || sort === "amount";
+  const base = supabase
     .from("invoices")
-    .select("*, orders(order_date)", { count: "exact" })
-    .order("issue_date", { ascending: false })
-    .order("invoice_number", { ascending: false })
-    .range(from, to);
-  const invoices = (data ?? []) as InvoiceRow[];
+    .select("*, orders(order_date)", { count: "exact" });
+  const { data, count } = inMemory
+    ? await base.order("invoice_number", { ascending: false }).limit(SORT_CAP)
+    : sort === "due"
+      ? await base
+          .order("due_date", { ascending: true })
+          .order("invoice_number", { ascending: false })
+          .range(from, to)
+      : await base
+          .order("issue_date", { ascending: false })
+          .order("invoice_number", { ascending: false })
+          .range(from, to);
+
+  const fetched = (data ?? []) as InvoiceRow[];
+  // Array.sort is stable, so the invoice_number ordering applied above survives
+  // as the tiebreak within an equal rank / equal amount.
+  const invoices = inMemory
+    ? [...fetched]
+        .sort((a, b) =>
+          sort === "status"
+            ? invoiceDisplayRank(a) - invoiceDisplayRank(b)
+            : invoiceAmountDue(b) - invoiceAmountDue(a),
+        )
+        .slice(from, to + 1)
+    : fetched;
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
 
   if (invoices.length === 0 && total > 0 && page > totalPages) {
-    redirect(`/invoices?page=${totalPages}`);
+    const keep = sort === DEFAULT_SORT ? "" : `&sort=${sort}`;
+    redirect(`/invoices?page=${totalPages}${keep}`);
   }
 
   return (
@@ -68,9 +116,18 @@ export default async function InvoicesPage({
         isAdminUser={isAdmin(user.email)}
       />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-        <h1 className="text-2xl font-bold tracking-tight text-stone-900">
-          Invoices
-        </h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold tracking-tight text-stone-900">
+            Invoices
+          </h1>
+          {total > 0 ? (
+            <SortSelect
+              value={sort}
+              options={SORT_OPTIONS}
+              defaultValue={DEFAULT_SORT}
+            />
+          ) : null}
+        </div>
 
         {payerror ? (
           <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800">
@@ -129,7 +186,12 @@ export default async function InvoicesPage({
                 order_date: inv.orders?.order_date ?? null,
               }))}
             />
-            <Pagination page={page} totalPages={totalPages} basePath="/invoices" />
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              basePath="/invoices"
+              query={sort === DEFAULT_SORT ? {} : { sort }}
+            />
           </>
         )}
       </main>
