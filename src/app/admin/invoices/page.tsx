@@ -8,7 +8,10 @@ import { businessToday } from "@/lib/standing-orders";
 import { RecomputeOverdueButton } from "./recompute-overdue-button";
 import { ReconcileButton } from "./reconcile-button";
 import { RunAutopayButton } from "./run-autopay-button";
-import { InvoiceDisplayBadge } from "@/components/invoice-display-badge";
+import {
+  InvoiceDisplayBadge,
+  invoiceDisplayRank,
+} from "@/components/invoice-display-badge";
 import { InvoiceStatusForm } from "./invoice-status-form";
 import { CreditOverrideBadge } from "@/components/credit-override-badge";
 import type { Invoice } from "@/lib/types";
@@ -226,9 +229,24 @@ export default async function AdminInvoicesPage({
     return count ?? 0;
   };
 
+  // Sorting by Status is special. The column renders the DERIVED badge state,
+  // which isn't a column — it's computed from status + the Stripe tag + the note
+  // markers + check_mailed_at. Ordering on the stored `status` column groups the
+  // wrong thing: rows badged "Overdue" and "Check Mailed" are both stored
+  // 'overdue', so they interleave and look like the sort only works per page.
+  //
+  // So for this one sort we page in memory: pull the filtered set, rank it with
+  // invoiceDisplayRank (the same function behind the badge, so the two can't
+  // drift), then slice. Bounded by STATUS_SORT_CAP — this list is in the low
+  // hundreds; if it ever outgrows that, this needs a real ranked column in the DB.
+  const sortingByStatus = sort === "status";
+  const STATUS_SORT_CAP = 2000;
+
   const [{ data }, countEntries, { data: summaryRows }, { data: enrolledRows }] =
     await Promise.all([
-      dataQuery.range(from, to),
+      sortingByStatus
+        ? dataQuery.limit(STATUS_SORT_CAP)
+        : dataQuery.range(from, to),
       Promise.all(
         FILTER_TABS.map(async (t) => [t.key, await countFor(t.key)] as const),
       ),
@@ -241,7 +259,17 @@ export default async function AdminInvoicesPage({
     ]);
   const counts = Object.fromEntries(countEntries) as Record<string, number>;
   const enrolled = (enrolledRows ?? []) as EnrolledCustomer[];
-  const invoices = (data ?? []) as InvoiceRow[];
+  const fetched = (data ?? []) as InvoiceRow[];
+  // Rank by the badge, keeping invoice_number (already applied server-side) as
+  // the tiebreak, then take this page's slice.
+  const invoices = sortingByStatus
+    ? [...fetched]
+        .sort((a, b) => {
+          const d = invoiceDisplayRank(a) - invoiceDisplayRank(b);
+          return dir === "asc" ? d : -d;
+        })
+        .slice(from, to + 1)
+    : fetched;
   const total = counts[status] ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
 

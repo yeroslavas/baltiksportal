@@ -104,6 +104,27 @@ export function invoiceDisplayState(
   return inv.status; // "unpaid" | "overdue"
 }
 
+// Sort order for the Status column. The column shows the DERIVED state, so
+// ordering by the stored `status` column groups the wrong thing — rows badged
+// "Check Mailed" and "Overdue" are both stored 'overdue' and interleave. Sorting
+// on this rank (via invoiceDisplayState, the same function the badge uses) keeps
+// what you see and what you sort by in step, with no second copy of the rules.
+// Order runs roughly worst-to-best so ascending surfaces what needs chasing.
+const DISPLAY_ORDER: InvoiceDisplayState[] = [
+  "declined",
+  "overdue",
+  "incomplete",
+  "unpaid",
+  "check_mailed",
+  "processing",
+  "paid",
+  "canceled",
+];
+
+export function invoiceDisplayRank(inv: InvoiceBadgeInput): number {
+  return DISPLAY_ORDER.indexOf(invoiceDisplayState(inv));
+}
+
 const STYLES: Record<InvoiceDisplayState, string> = {
   paid: "bg-green-100 text-green-800",
   processing: "bg-blue-100 text-blue-800",
