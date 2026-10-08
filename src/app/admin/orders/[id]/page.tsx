@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fromParam } from "@/lib/return-to";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice, formatDate, formatDateOnly } from "@/lib/format";
 import { OrderStatusForm } from "../order-status-form";
@@ -138,7 +139,7 @@ export default async function AdminOrderDetailPage({
             <div className="flex items-center gap-3">
               <InvoiceStatusBadge status={invoice.status} />
               <Link
-                href={`/admin/invoices/${invoice.id}`}
+                href={`/admin/invoices/${invoice.id}${fromParam(`/admin/orders/${order.id}`)}`}
                 className="text-sm font-medium text-brand-700 hover:underline"
               >
                 View invoice
