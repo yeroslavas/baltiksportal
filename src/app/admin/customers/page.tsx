@@ -9,7 +9,6 @@ import { creditOverrideActive } from "@/lib/invoices";
 import { CreditStatusTag, type CreditStatus } from "@/components/credit-status-tag";
 import type { Customer } from "@/lib/types";
 import { CreateCustomerForm } from "./create-customer-form";
-import { ResetPasswordForm } from "./reset-password-form";
 
 const SORTS: Record<string, string> = {
   business: "business_name",
@@ -287,7 +286,6 @@ export default async function AdminCustomersPage({
                       >
                         Duplicate
                       </Link>
-                      <ResetPasswordForm userId={c.user_id} />
                     </div>
                   </td>
                 </tr>

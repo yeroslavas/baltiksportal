@@ -14,6 +14,7 @@ import {
 import { InvoiceDisplayBadge } from "@/components/invoice-display-badge";
 import { InvoiceStatusForm } from "@/components/invoice-status-form";
 import { fromParam } from "@/lib/return-to";
+import { CustomerLogins, type LoginRow } from "../customer-logins";
 import type { Customer, Invoice } from "@/lib/types";
 
 // Why an outstanding invoice ISN'T holding the customer on credit stop. Mirrors
@@ -78,6 +79,28 @@ export default async function AdminCustomerDetailPage({
   const open = (openData ?? []) as Invoice[];
   const blockingInvoices = open.filter((i) => blockingIds.has(i.id));
   const otherOpen = open.filter((i) => !blockingIds.has(i.id));
+
+  // The logins on this account. Emails live in auth, not in our tables, so each
+  // membership is resolved through the admin API. Small by nature — a handful
+  // of people per account at most.
+  const { data: memberships } = await admin
+    .from("customer_users")
+    .select("user_id")
+    .eq("customer_id", customer.id)
+    .order("created_at");
+  const logins: LoginRow[] = (
+    await Promise.all(
+      (memberships ?? []).map(async ({ user_id }) => {
+        const { data } = await admin.auth.admin.getUserById(user_id as string);
+        if (!data?.user) return null;
+        return {
+          userId: data.user.id,
+          email: data.user.email ?? "(no email)",
+          isPrimary: data.user.id === customer.user_id,
+        };
+      }),
+    )
+  ).filter((l): l is LoginRow => l !== null);
 
   const sum = (rows: Invoice[]) =>
     rows.reduce((s, i) => s + invoiceAmountDue(i), 0);
@@ -250,6 +273,8 @@ export default async function AdminCustomerDetailPage({
           invoiceRows(otherOpen, true)
         )}
       </section>
+
+      <CustomerLogins customerId={customer.id} logins={logins} />
 
       <p className="text-sm text-stone-500">
         Total outstanding:{" "}

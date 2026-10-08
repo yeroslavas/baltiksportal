@@ -295,25 +295,13 @@ export async function updateCustomer(
           credit_hold_override_reason: overrideReason || null,
         };
 
-  // If the login email changed, update the auth user. The account, its pricing,
-  // and its history all stay — only the sign-in credential changes.
-  if (email !== (existing.email ?? "").toLowerCase()) {
-    const { error: authError } = await admin.auth.admin.updateUserById(
-      existing.user_id,
-      { email, email_confirm: true },
-    );
-    if (authError) {
-      const dup = /already|registered|exists|duplicate/i.test(authError.message);
-      return {
-        error: dup
-          ? "That email is already used by another login."
-          : authError.message,
-        success: null,
-      };
-    }
-  }
+  // NOTE: this deliberately no longer touches any auth user. customers.email is
+  // the account's CONTACT address (auto-pay notices, the Stripe customer); it
+  // stopped being a credential when accounts gained multiple logins, since
+  // "the" login no longer exists. Sign-in emails are changed per login in the
+  // Logins section on the customer page (updateLoginEmail).
 
-  // Update the profile (keep customers.email in sync with the login email).
+  // Update the profile.
   const { error: updateError } = await admin
     .from("customers")
     .update({
@@ -369,4 +357,200 @@ export async function resetCustomerPassword(
     error: null,
     success: "Password updated — copy it and send it to the customer.",
   };
+}
+
+// ---------------------------------------------------------------------------
+// Logins
+//
+// An account can have SEVERAL logins — commonly the person placing orders is
+// not the person paying the invoices. Membership lives in customer_users; see
+// current_customer_ids() in schema.sql for how it grants access.
+//
+// customers.user_id is still maintained as a legacy "primary login" pointer
+// (the transitional fallback from Stage 1). Removal repoints it rather than
+// orphaning it, so the column stays valid until it is dropped.
+// ---------------------------------------------------------------------------
+
+// Add another login to an existing account.
+export async function addCustomerLogin(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const adminUser = await requireAdmin();
+
+  const customerId = String(formData.get("customer_id") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+
+  if (!customerId) return { error: "Missing customer reference.", success: null };
+  if (!email) return { error: "Enter an email address.", success: null };
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters.", success: null };
+  }
+
+  const admin = createAdminClient();
+  const { data: customer } = await admin
+    .from("customers")
+    .select("id, business_name")
+    .eq("id", customerId)
+    .maybeSingle<{ id: string; business_name: string }>();
+  if (!customer) return { error: "Customer not found.", success: null };
+
+  const { data: created, error: authError } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+  if (authError || !created.user) {
+    const dup = /already|registered|exists|duplicate/i.test(
+      authError?.message ?? "",
+    );
+    return {
+      error: dup
+        ? "That email is already used by another login."
+        : (authError?.message ?? "Could not create the login."),
+      success: null,
+    };
+  }
+
+  const { error: linkError } = await admin.from("customer_users").insert({
+    customer_id: customer.id,
+    user_id: created.user.id,
+    created_by: adminUser.email ?? null,
+  });
+  if (linkError) {
+    // Roll back so we never leave a login that can sign in with no account.
+    await admin.auth.admin.deleteUser(created.user.id);
+    return { error: linkError.message, success: null };
+  }
+
+  revalidatePath(`/admin/customers/${customer.id}`);
+  revalidatePath("/admin/customers");
+  return {
+    error: null,
+    success: `Added ${email} — copy the password and send it to them.`,
+  };
+}
+
+// Remove a login from an account. The account must keep at least one.
+export async function removeCustomerLogin(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const customerId = String(formData.get("customer_id") ?? "").trim();
+  const userId = String(formData.get("user_id") ?? "").trim();
+  if (!customerId || !userId) {
+    return { error: "Missing login reference.", success: null };
+  }
+
+  const admin = createAdminClient();
+  const { data: links } = await admin
+    .from("customer_users")
+    .select("user_id")
+    .eq("customer_id", customerId);
+  const all = (links ?? []).map((l) => l.user_id as string);
+
+  if (!all.includes(userId)) {
+    return { error: "That login is not on this account.", success: null };
+  }
+  // Removing the last one would leave an account nobody can sign in to.
+  if (all.length <= 1) {
+    return {
+      error: "An account must keep at least one login. Add another first.",
+      success: null,
+    };
+  }
+
+  const { error: unlinkError } = await admin
+    .from("customer_users")
+    .delete()
+    .eq("customer_id", customerId)
+    .eq("user_id", userId);
+  if (unlinkError) return { error: unlinkError.message, success: null };
+
+  // If this was the legacy primary pointer, move it to a surviving login —
+  // customers.user_id is NOT NULL and still feeds the transitional fallback.
+  const { data: customer } = await admin
+    .from("customers")
+    .select("user_id")
+    .eq("id", customerId)
+    .maybeSingle<{ user_id: string }>();
+  if (customer?.user_id === userId) {
+    const next = all.find((u) => u !== userId);
+    if (next) {
+      await admin.from("customers").update({ user_id: next }).eq("id", customerId);
+    }
+  }
+
+  // DANGER: customers.user_id is `references auth.users on delete cascade`, so
+  // deleting an auth user that the column still points at would cascade-delete
+  // the CUSTOMER — orders and invoices with it. Re-read and refuse rather than
+  // trusting the repoint above to have worked.
+  const { data: after } = await admin
+    .from("customers")
+    .select("user_id")
+    .eq("id", customerId)
+    .maybeSingle<{ user_id: string }>();
+  if (!after || after.user_id === userId) {
+    // Put the membership back so the login isn't half-removed.
+    await admin
+      .from("customer_users")
+      .insert({ customer_id: customerId, user_id: userId });
+    return {
+      error:
+        "Could not move the primary login pointer off this login, so removing it was unsafe. Nothing was changed.",
+      success: null,
+    };
+  }
+
+  // The unique index on customer_users.user_id means a login belongs to exactly
+  // one account, so once unlinked it has no purpose and would be a dangling
+  // sign-in with nowhere to land.
+  const { error: delError } = await admin.auth.admin.deleteUser(userId);
+  if (delError) {
+    return {
+      error: `Login removed from the account, but deleting it failed: ${delError.message}`,
+      success: null,
+    };
+  }
+
+  revalidatePath(`/admin/customers/${customerId}`);
+  revalidatePath("/admin/customers");
+  return { error: null, success: "Login removed." };
+}
+
+// Change the sign-in email of ONE login. Does not touch customers.email, which
+// is the account's contact address rather than a credential.
+export async function updateLoginEmail(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const customerId = String(formData.get("customer_id") ?? "").trim();
+  const userId = String(formData.get("user_id") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!customerId || !userId) {
+    return { error: "Missing login reference.", success: null };
+  }
+  if (!email) return { error: "Enter an email address.", success: null };
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(userId, {
+    email,
+    email_confirm: true,
+  });
+  if (error) {
+    const dup = /already|registered|exists|duplicate/i.test(error.message);
+    return {
+      error: dup ? "That email is already used by another login." : error.message,
+      success: null,
+    };
+  }
+
+  revalidatePath(`/admin/customers/${customerId}`);
+  revalidatePath("/admin/customers");
+  return { error: null, success: `Sign-in email changed to ${email}.` };
 }
