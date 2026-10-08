@@ -245,7 +245,14 @@ export default async function AdminCustomersPage({
               {customers.map((c) => (
                 <tr key={c.id} className="border-b border-stone-100 last:border-0">
                   <td className="px-6 py-3 font-medium text-stone-900">
-                    {c.business_name}
+                    {/* Opens the credit summary: which invoices are holding this
+                        customer on stop, and which outstanding ones aren't. */}
+                    <Link
+                      href={`/admin/customers/${c.id}`}
+                      className="text-brand-700 hover:underline"
+                    >
+                      {c.business_name}
+                    </Link>
                   </td>
                   <td className="px-6 py-3">
                     <CreditStatusTag
