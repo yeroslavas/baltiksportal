@@ -424,6 +424,7 @@ export async function addCustomerLogin(
     return { error: linkError.message, success: null };
   }
 
+  revalidatePath(`/admin/customers/${customer.id}/edit`);
   revalidatePath(`/admin/customers/${customer.id}`);
   revalidatePath("/admin/customers");
   return {
@@ -516,6 +517,7 @@ export async function removeCustomerLogin(
     };
   }
 
+  revalidatePath(`/admin/customers/${customerId}/edit`);
   revalidatePath(`/admin/customers/${customerId}`);
   revalidatePath("/admin/customers");
   return { error: null, success: "Login removed." };
@@ -550,6 +552,7 @@ export async function updateLoginEmail(
     };
   }
 
+  revalidatePath(`/admin/customers/${customerId}/edit`);
   revalidatePath(`/admin/customers/${customerId}`);
   revalidatePath("/admin/customers");
   return { error: null, success: `Sign-in email changed to ${email}.` };

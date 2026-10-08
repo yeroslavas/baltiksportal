@@ -3,6 +3,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
 import type { Customer } from "@/lib/types";
 import { EditCustomerForm } from "./edit-customer-form";
+import {
+  CustomerLogins,
+  type LoginRow,
+} from "../../customer-logins";
 
 export default async function EditCustomerPage({
   params,
@@ -18,6 +22,27 @@ export default async function EditCustomerPage({
     .select("*")
     .eq("id", id)
     .maybeSingle<Customer>();
+
+  // The logins on this account. Emails live in auth rather than our tables, so
+  // each membership is resolved through the admin API — a handful per account.
+  const { data: memberships } = await admin
+    .from("customer_users")
+    .select("user_id")
+    .eq("customer_id", id)
+    .order("created_at");
+  const logins: LoginRow[] = (
+    await Promise.all(
+      (memberships ?? []).map(async ({ user_id }) => {
+        const { data } = await admin.auth.admin.getUserById(user_id as string);
+        if (!data?.user) return null;
+        return {
+          userId: data.user.id,
+          email: data.user.email ?? "(no email)",
+          isPrimary: data.user.id === customer?.user_id,
+        };
+      }),
+    )
+  ).filter((l): l is LoginRow => l !== null);
 
   if (!customer) {
     return (
@@ -56,6 +81,8 @@ export default async function EditCustomerPage({
           deliveryWindows={settings.deliveryWindows}
         />
       </section>
+
+      <CustomerLogins customerId={customer.id} logins={logins} />
     </div>
   );
 }
