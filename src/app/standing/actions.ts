@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getCurrentCustomer } from "@/lib/current-customer";
 import { getUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { businessToday } from "@/lib/standing-orders";
@@ -13,11 +14,11 @@ async function authorize(standingOrderId: string) {
   const user = await getUser();
   if (!user || !standingOrderId) return null;
   const admin = createAdminClient();
-  const { data: customer } = await admin
-    .from("customers")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle<{ id: string }>();
+  const customer = await getCurrentCustomer<{ id: string }>(
+    admin,
+    user.id,
+    "id",
+  );
   if (!customer) return null;
   const { data: so } = await admin
     .from("standing_orders")

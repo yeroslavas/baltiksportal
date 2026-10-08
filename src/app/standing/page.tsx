@@ -1,4 +1,5 @@
 import { requireUser, isAdmin } from "@/lib/auth";
+import { getCurrentCustomer } from "@/lib/current-customer";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CustomerHeader } from "@/components/customer-header";
 import { formatDateOnly } from "@/lib/format";
@@ -23,11 +24,11 @@ type ItemRow = {
 export default async function CustomerStandingOrdersPage() {
   const user = await requireUser();
   const admin = createAdminClient();
-  const { data: customer } = await admin
-    .from("customers")
-    .select("id, business_name")
-    .eq("user_id", user.id)
-    .maybeSingle<{ id: string; business_name: string }>();
+  const customer = await getCurrentCustomer<{ id: string; business_name: string }>(
+    admin,
+    user.id,
+    "id, business_name",
+  );
   const label = customer?.business_name ?? user.email ?? "";
 
   const { data: soData } = customer

@@ -1,4 +1,5 @@
 import { requireUser, isAdmin } from "@/lib/auth";
+import { getCurrentCustomer } from "@/lib/current-customer";
 import { createClient } from "@/lib/supabase/server";
 import { getSettings } from "@/lib/settings";
 import { CustomerHeader } from "@/components/customer-header";
@@ -9,11 +10,11 @@ export default async function CartPage() {
   const user = await requireUser();
   const settings = await getSettings();
   const supabase = await createClient();
-  const { data: customer } = await supabase
-    .from("customers")
-    .select("business_name, slice_fee")
-    .eq("user_id", user.id)
-    .maybeSingle<{ business_name: string; slice_fee: number }>();
+  const customer = await getCurrentCustomer<{ business_name: string; slice_fee: number }>(
+    supabase,
+    user.id,
+    "business_name, slice_fee",
+  );
 
   return (
     <div className="flex flex-1 flex-col">

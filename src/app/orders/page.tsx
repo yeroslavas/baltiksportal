@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getCurrentCustomer } from "@/lib/current-customer";
 import { redirect } from "next/navigation";
 import { requireUser, isAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -47,11 +48,11 @@ export default async function OrdersPage({
 
   const user = await requireUser();
   const supabase = await createClient();
-  const { data: customer } = await supabase
-    .from("customers")
-    .select("business_name")
-    .eq("user_id", user.id)
-    .maybeSingle<{ business_name: string }>();
+  const customer = await getCurrentCustomer<{ business_name: string }>(
+    supabase,
+    user.id,
+    "business_name",
+  );
 
   // RLS limits this to the signed-in customer's own orders. count: "exact"
   // returns the full total (ignoring the range) so we can page accurately.

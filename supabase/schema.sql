@@ -72,6 +72,79 @@ alter table public.customers add column if not exists credit_hold_override_reaso
 alter table public.customers add column if not exists credit_hold_override_set_by text;
 alter table public.customers add column if not exists credit_hold_override_set_at timestamptz;
 
+-- ----------------------------------------------------------------------------
+-- Customer logins (membership)
+--
+-- An account can have SEVERAL logins — commonly the person who places orders is
+-- not the person who pays the invoices. Membership lives here rather than on
+-- customers.user_id, which only ever allowed one.
+--
+-- All logins on an account are equal: there are deliberately no per-login roles.
+-- Pricing, terms, the auto-pay mandate and credit standing already live on the
+-- customer, so they are shared without any further work.
+-- ----------------------------------------------------------------------------
+
+create table if not exists public.customer_users (
+  customer_id uuid not null references public.customers (id) on delete cascade,
+  user_id     uuid not null references auth.users (id) on delete cascade,
+  created_at  timestamptz not null default now(),
+  -- Admin email that added this login (audit trail; null for the backfill).
+  created_by  text,
+  primary key (customer_id, user_id)
+);
+
+-- A login belongs to exactly ONE account. Dropping this unique index is
+-- precisely what would later enable "one login oversees several locations" —
+-- keeping it now stops that model appearing by accident.
+create unique index if not exists customer_users_user_id_key
+  on public.customer_users (user_id);
+create index if not exists idx_customer_users_customer
+  on public.customer_users (customer_id);
+
+-- Backfill the existing one-login-per-account rows. Idempotent.
+insert into public.customer_users (customer_id, user_id)
+  select id, user_id from public.customers
+  on conflict do nothing;
+
+alter table public.customer_users enable row level security;
+
+-- A signed-in user can see only their own membership rows.
+drop policy if exists "read own memberships" on public.customer_users;
+create policy "read own memberships"
+  on public.customer_users for select
+  to authenticated
+  using (user_id = (select auth.uid()));
+
+grant select (customer_id, user_id) on public.customer_users to authenticated;
+
+-- THE single definition of "which customer accounts may this login see".
+--
+-- Every customer-facing RLS policy goes through this one function instead of
+-- repeating the join, so the rule can't drift between tables — the same reason
+-- the credit stop's duplication across three query sites has caused trouble.
+--
+-- SECURITY DEFINER so it reads customer_users without re-entering RLS (a policy
+-- on customers that queried customers through RLS would recurse). search_path is
+-- pinned, which is required for a definer function to be safe.
+--
+-- The second branch is TRANSITIONAL: it keeps the legacy customers.user_id
+-- pointer working so the live site keeps functioning before/while the app is
+-- deployed. Remove that branch (and the column) once the admin Logins UI lands.
+create or replace function public.current_customer_ids()
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select customer_id from public.customer_users where user_id = (select auth.uid())
+  union
+  select id from public.customers where user_id = (select auth.uid())
+$$;
+
+revoke all on function public.current_customer_ids() from public;
+grant execute on function public.current_customer_ids() to authenticated;
+
 -- Products: the catalog. base_price applies unless a customer override exists.
 -- name/description/unit/base_price are customer-facing; sku + the report_*/
 -- bake_time/product_type fields are internal (reporting, managed via CSV import).
@@ -144,12 +217,12 @@ alter table public.customers        enable row level security;
 alter table public.products         enable row level security;
 alter table public.customer_pricing enable row level security;
 
--- A signed-in customer can read only their own customer row.
+-- A signed-in customer can read only the account(s) their login belongs to.
 drop policy if exists "customers read own row" on public.customers;
 create policy "customers read own row"
   on public.customers for select
   to authenticated
-  using (user_id = (select auth.uid()));
+  using (id in (select public.current_customer_ids()));
 
 -- Any signed-in user can read the active catalog.
 drop policy if exists "read active products" on public.products;
@@ -164,9 +237,7 @@ create policy "read own pricing"
   on public.customer_pricing for select
   to authenticated
   using (
-    customer_id in (
-      select id from public.customers where user_id = (select auth.uid())
-    )
+    customer_id in (select public.current_customer_ids())
   );
 
 -- ----------------------------------------------------------------------------
@@ -262,9 +333,7 @@ create policy "read own orders"
   on public.orders for select
   to authenticated
   using (
-    customer_id in (
-      select id from public.customers where user_id = (select auth.uid())
-    )
+    customer_id in (select public.current_customer_ids())
   );
 
 -- A customer can read only the items of their own orders.
@@ -274,10 +343,8 @@ create policy "read own order items"
   to authenticated
   using (
     order_id in (
-      select o.id
-      from public.orders o
-      join public.customers c on c.id = o.customer_id
-      where c.user_id = (select auth.uid())
+      select o.id from public.orders o
+      where o.customer_id in (select public.current_customer_ids())
     )
   );
 
@@ -590,7 +657,5 @@ create policy "read own invoices"
   on public.invoices for select
   to authenticated
   using (
-    customer_id in (
-      select id from public.customers where user_id = (select auth.uid())
-    )
+    customer_id in (select public.current_customer_ids())
   );

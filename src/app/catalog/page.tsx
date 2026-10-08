@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { getCurrentCustomer } from "@/lib/current-customer";
 import { requireUser, isAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice } from "@/lib/format";
@@ -14,11 +15,11 @@ export default async function CatalogPage() {
   // Resolve this user's customer record (RLS limits this to their own row).
   // Only the customer-facing columns — internal fields (sales_rep/tier/notes)
   // aren't selected, and the API roles can't read them either (see schema.sql).
-  const { data: customer } = await supabase
-    .from("customers")
-    .select("id, business_name, slice_fee")
-    .eq("user_id", user.id)
-    .maybeSingle<Pick<Customer, "id" | "business_name" | "slice_fee">>();
+  const customer = await getCurrentCustomer<Pick<Customer, "id" | "business_name" | "slice_fee">>(
+    supabase,
+    user.id,
+    "id, business_name, slice_fee",
+  );
   const sliceFee = Number(customer?.slice_fee ?? 0);
 
   // Active catalog + this customer's price overrides. Customer-facing columns

@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import { getCurrentCustomer } from "@/lib/current-customer";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getUser } from "@/lib/auth";
@@ -21,16 +22,16 @@ async function currentCustomer() {
   const user = await getUser();
   if (!user) redirect("/login");
   const admin = createAdminClient();
-  const { data: customer } = await admin
-    .from("customers")
-    .select("id, email, business_name, autopay_payment_method_id")
-    .eq("user_id", user.id)
-    .maybeSingle<{
+  const customer = await getCurrentCustomer<{
       id: string;
       email: string | null;
       business_name: string;
       autopay_payment_method_id: string | null;
-    }>();
+    }>(
+    admin,
+    user.id,
+    "id, email, business_name, autopay_payment_method_id",
+  );
   if (!customer) redirect("/invoices");
   return { admin, customer };
 }

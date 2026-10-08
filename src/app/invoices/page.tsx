@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getCurrentCustomer } from "@/lib/current-customer";
 import { requireUser, isAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { CustomerHeader } from "@/components/customer-header";
@@ -54,15 +55,15 @@ export default async function InvoicesPage({
 
   const user = await requireUser();
   const supabase = await createClient();
-  const { data: customer } = await supabase
-    .from("customers")
-    .select("business_name, autopay_enabled, autopay_bank_last4")
-    .eq("user_id", user.id)
-    .maybeSingle<{
+  const customer = await getCurrentCustomer<{
       business_name: string;
       autopay_enabled: boolean;
       autopay_bank_last4: string | null;
-    }>();
+    }>(
+    supabase,
+    user.id,
+    "business_name, autopay_enabled, autopay_bank_last4",
+  );
 
   // RLS limits this to the signed-in customer's own invoices.
   const from = (page - 1) * DEFAULT_PAGE_SIZE;
