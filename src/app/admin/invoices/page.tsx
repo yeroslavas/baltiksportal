@@ -13,6 +13,7 @@ import {
   invoiceDisplayRank,
 } from "@/components/invoice-display-badge";
 import { InvoiceStatusForm } from "@/components/invoice-status-form";
+import { fromParam } from "@/lib/return-to";
 import { CreditOverrideBadge } from "@/components/credit-override-badge";
 import type { Invoice } from "@/lib/types";
 
@@ -104,6 +105,12 @@ export default async function AdminInvoicesPage({
     const s = p.toString();
     return s ? `/admin/invoices?${s}` : "/admin/invoices";
   };
+
+  // This list's current URL, including the page number — what a row's View link
+  // hands to the detail page so its back link can return here intact.
+  const returnHref = buildHref({
+    page: page > 1 ? String(page) : undefined,
+  });
 
   // Preserved on sort-header and pagination links so they don't drop the active
   // filter/search. (Sort headers add sort/dir themselves; pagination gets them
@@ -540,8 +547,11 @@ export default async function AdminInvoicesPage({
                       </div>
                     </td>
                     <td className="px-6 py-3 text-right">
+                      {/* Carry this list's exact state (tab, search, sort,
+                          page) so the detail page's back link returns here
+                          rather than to the unfiltered list. */}
                       <Link
-                        href={`/admin/invoices/${inv.id}`}
+                        href={`/admin/invoices/${inv.id}${fromParam(returnHref)}`}
                         className="font-medium text-brand-700 hover:underline"
                       >
                         View

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice, formatDate, formatDateOnly } from "@/lib/format";
 import { InvoiceStatusForm } from "@/components/invoice-status-form";
+import { returnTo } from "@/lib/return-to";
 import { PaymentNoteForm } from "../payment-note-form";
 import { ApplyCreditForm } from "../apply-credit-form";
 import { FulfillmentInfo } from "@/components/fulfillment-info";
@@ -20,10 +21,20 @@ type InvoiceWithRefs = Invoice & {
 
 export default async function AdminInvoiceDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  // `from` carries the URL of the page that linked here (a filtered invoice
+  // list, a customer's credit summary, an order), so the back link returns to
+  // it with its filters intact instead of dumping you on the unfiltered list.
+  searchParams: Promise<{ from?: string }>;
 }) {
   const { id } = await params;
+  const { from } = await searchParams;
+  const back = returnTo(from, {
+    href: "/admin/invoices",
+    label: "Back to invoices",
+  });
   const admin = createAdminClient();
   const { data: invoice } = await admin
     .from("invoices")
@@ -38,10 +49,10 @@ export default async function AdminInvoiceDetailPage({
           Invoice not found
         </h1>
         <Link
-          href="/admin/invoices"
+          href={back.href}
           className="font-medium text-brand-700 hover:underline"
         >
-          ← Back to invoices
+          ← {back.label}
         </Link>
       </div>
     );
@@ -66,10 +77,10 @@ export default async function AdminInvoiceDetailPage({
     <div className="space-y-8">
       <div>
         <Link
-          href="/admin/invoices"
+          href={back.href}
           className="text-sm font-medium text-brand-700 hover:underline"
         >
-          ← Back to invoices
+          ← {back.label}
         </Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold tracking-tight text-stone-900">

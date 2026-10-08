@@ -13,6 +13,7 @@ import {
 } from "@/components/credit-status-tag";
 import { InvoiceDisplayBadge } from "@/components/invoice-display-badge";
 import { InvoiceStatusForm } from "@/components/invoice-status-form";
+import { fromParam } from "@/lib/return-to";
 import type { Customer, Invoice } from "@/lib/types";
 
 // Why an outstanding invoice ISN'T holding the customer on credit stop. Mirrors
@@ -107,7 +108,10 @@ export default async function AdminCustomerDetailPage({
         {rows.map((i) => (
           <tr key={i.id} className="border-b border-stone-100 last:border-0">
             <td className="px-6 py-2">
-              <Link href={`/admin/invoices/${i.id}`} className={linkClass}>
+              <Link
+                href={`/admin/invoices/${i.id}${fromParam(`/admin/customers/${customer.id}`)}`}
+                className={linkClass}
+              >
                 {i.invoice_number}
               </Link>
             </td>
