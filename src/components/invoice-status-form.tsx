@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { setInvoiceStatus } from "./actions";
+import { setInvoiceStatus } from "@/app/admin/invoices/actions";
 import {
   INVOICE_STATUSES,
   CHECK_MAILED_OPTION,

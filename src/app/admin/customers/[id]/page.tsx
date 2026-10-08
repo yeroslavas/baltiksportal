@@ -12,6 +12,7 @@ import {
   type CreditStatus,
 } from "@/components/credit-status-tag";
 import { InvoiceDisplayBadge } from "@/components/invoice-display-badge";
+import { InvoiceStatusForm } from "@/components/invoice-status-form";
 import type { Customer, Invoice } from "@/lib/types";
 
 // Why an outstanding invoice ISN'T holding the customer on credit stop. Mirrors
@@ -111,7 +112,20 @@ export default async function AdminCustomerDetailPage({
               </Link>
             </td>
             <td className="px-6 py-2">
-              <InvoiceDisplayBadge inv={i} />
+              {/* Settle straight from here — the common case is realising an
+                  invoice was already paid while looking at why they're on
+                  stop. Saving re-renders this page, so the row moves to the
+                  other section (or disappears) immediately. */}
+              <div className="flex items-center gap-2">
+                <InvoiceDisplayBadge inv={i} />
+                {i.status !== "canceled" ? (
+                  <InvoiceStatusForm
+                    id={i.id}
+                    status={i.status}
+                    checkMailedAt={i.check_mailed_at}
+                  />
+                ) : null}
+              </div>
             </td>
             <td className="px-6 py-2 text-stone-600">
               {formatDateOnly(i.due_date)}

@@ -187,6 +187,10 @@ export async function setInvoiceStatus(formData: FormData) {
     revalidatePath("/admin/invoices");
     revalidatePath(`/admin/invoices/${id}`);
     revalidatePath("/admin/customers"); // credit-status column
+    // The per-customer credit summary lists these invoices and splits them by
+    // what is blocking ordering, so it has to refresh too (a dynamic segment,
+    // hence the required "page" type).
+    revalidatePath("/admin/customers/[id]", "page");
     return;
   }
 
@@ -210,6 +214,10 @@ export async function setInvoiceStatus(formData: FormData) {
   revalidatePath("/admin/invoices");
   revalidatePath(`/admin/invoices/${id}`);
   revalidatePath("/admin/customers"); // credit-status column
+  // The per-customer credit summary lists these invoices and splits them by
+  // what is blocking ordering, so it has to refresh too (dynamic segment =>
+  // the "page" type is required).
+  revalidatePath("/admin/customers/[id]", "page");
 }
 
 export type NoteState = { saved: boolean };
@@ -249,6 +257,10 @@ export async function recomputeOverdue(
   try {
     const count = await markOverdueInvoices();
     revalidatePath("/admin/invoices");
+    // Flipping invoices to "overdue" in bulk changes who is on credit stop, so
+    // the customers list and the per-customer credit summaries go stale too.
+    revalidatePath("/admin/customers");
+    revalidatePath("/admin/customers/[id]", "page");
     return {
       message:
         count === 0

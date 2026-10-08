@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice, formatDate, formatDateOnly } from "@/lib/format";
-import { InvoiceStatusForm } from "../invoice-status-form";
+import { InvoiceStatusForm } from "@/components/invoice-status-form";
 import { PaymentNoteForm } from "../payment-note-form";
 import { ApplyCreditForm } from "../apply-credit-form";
 import { FulfillmentInfo } from "@/components/fulfillment-info";

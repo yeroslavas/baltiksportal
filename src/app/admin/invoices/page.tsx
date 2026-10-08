@@ -12,7 +12,7 @@ import {
   InvoiceDisplayBadge,
   invoiceDisplayRank,
 } from "@/components/invoice-display-badge";
-import { InvoiceStatusForm } from "./invoice-status-form";
+import { InvoiceStatusForm } from "@/components/invoice-status-form";
 import { CreditOverrideBadge } from "@/components/credit-override-badge";
 import type { Invoice } from "@/lib/types";
 
