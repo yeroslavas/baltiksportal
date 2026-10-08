@@ -43,20 +43,36 @@ export async function createCustomer(
   }
 
   // 2) Create the linked customer profile.
-  const { error: insertError } = await admin.from("customers").insert({
-    user_id: created.user.id,
-    business_name: businessName,
-    contact_name: contactName || null,
-    email,
-    phone: phone || null,
-    address: address || null,
-  });
+  const { data: newCustomer, error: insertError } = await admin
+    .from("customers")
+    .insert({
+      user_id: created.user.id,
+      business_name: businessName,
+      contact_name: contactName || null,
+      email,
+      phone: phone || null,
+      address: address || null,
+    })
+    .select("id")
+    .single<{ id: string }>();
 
-  if (insertError) {
+  if (insertError || !newCustomer) {
     // Roll back the auth user so we don't leave an orphan login.
     await admin.auth.admin.deleteUser(created.user.id);
-    return { error: insertError.message, success: null };
+    return {
+      error: insertError?.message ?? "Could not create the customer.",
+      success: null,
+    };
   }
+
+  // 3) Record the login's membership. An account can have several logins, and
+  // membership — not customers.user_id — is what grants access (see
+  // current_customer_ids() in schema.sql). Writing both keeps the legacy
+  // fallback and the new path agreeing until user_id is dropped.
+  await admin.from("customer_users").insert({
+    customer_id: newCustomer.id,
+    user_id: created.user.id,
+  });
 
   revalidatePath("/admin/customers");
   revalidatePath("/admin");
@@ -156,6 +172,12 @@ export async function duplicateCustomer(
       success: null,
     };
   }
+
+  // Membership row for the new login — see createCustomer above.
+  await admin.from("customer_users").insert({
+    customer_id: newCust.id,
+    user_id: created.user.id,
+  });
 
   // 3) Copy the source's custom pricing to the new customer.
   const { data: pricing } = await admin

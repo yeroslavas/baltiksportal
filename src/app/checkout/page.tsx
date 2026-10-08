@@ -1,4 +1,5 @@
 import { requireUser, isAdmin } from "@/lib/auth";
+import { getCurrentCustomer } from "@/lib/current-customer";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
 import {
@@ -35,19 +36,17 @@ export default async function CheckoutPage() {
   // Service-role read, scoped to this user — waive_delivery_minimum is an
   // internal column the customer's own API key can't see.
   const admin = createAdminClient();
-  const { data: customer } = await admin
-    .from("customers")
-    .select(
-      "business_name, waive_delivery_minimum, delivery_window, allow_invoicing, slice_fee",
-    )
-    .eq("user_id", user.id)
-    .maybeSingle<{
-      business_name: string;
-      waive_delivery_minimum: boolean;
-      delivery_window: string | null;
-      allow_invoicing: boolean;
-      slice_fee: number;
-    }>();
+  const customer = await getCurrentCustomer<{
+    business_name: string;
+    waive_delivery_minimum: boolean;
+    delivery_window: string | null;
+    allow_invoicing: boolean;
+    slice_fee: number;
+  }>(
+    admin,
+    user.id,
+    "business_name, waive_delivery_minimum, delivery_window, allow_invoicing, slice_fee",
+  );
 
   return (
     <div className="flex flex-1 flex-col">

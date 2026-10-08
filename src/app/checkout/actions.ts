@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import { getCurrentCustomer } from "@/lib/current-customer";
 import { getUser, isAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createOrderForCustomer, priceOrder } from "@/lib/orders";
@@ -90,16 +91,16 @@ export async function placeOrder(
   }
 
   const admin = createAdminClient();
-  const { data: customer } = await admin
-    .from("customers")
-    .select("id, allow_invoicing, email, credit_hold_override_until")
-    .eq("user_id", user.id)
-    .maybeSingle<{
+  const customer = await getCurrentCustomer<{
       id: string;
       allow_invoicing: boolean;
       email: string | null;
       credit_hold_override_until: string | null;
-    }>();
+    }>(
+    admin,
+    user.id,
+    "id, allow_invoicing, email, credit_hold_override_until",
+  );
   if (!customer) {
     return { error: "No customer profile is linked to your account." };
   }

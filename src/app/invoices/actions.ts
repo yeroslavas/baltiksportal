@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import { getCurrentCustomer } from "@/lib/current-customer";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -18,11 +19,11 @@ export async function payInvoice(formData: FormData) {
   const admin = createAdminClient();
 
   // Trust anchor: resolve THIS user's customer record.
-  const { data: customer } = await admin
-    .from("customers")
-    .select("id, email, business_name")
-    .eq("user_id", user.id)
-    .maybeSingle<{ id: string; email: string | null; business_name: string }>();
+  const customer = await getCurrentCustomer<{ id: string; email: string | null; business_name: string }>(
+    admin,
+    user.id,
+    "id, email, business_name",
+  );
   if (!customer) redirect("/invoices");
 
   const { data: invoice } = await admin
@@ -116,11 +117,11 @@ export async function payInvoices(formData: FormData) {
   if (ids.length === 0) redirect("/invoices");
 
   const admin = createAdminClient();
-  const { data: customer } = await admin
-    .from("customers")
-    .select("id, email, business_name")
-    .eq("user_id", user.id)
-    .maybeSingle<{ id: string; email: string | null; business_name: string }>();
+  const customer = await getCurrentCustomer<{ id: string; email: string | null; business_name: string }>(
+    admin,
+    user.id,
+    "id, email, business_name",
+  );
   if (!customer) redirect("/invoices");
 
   // Only this customer's own, still-payable invoices (and with a balance left

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getCurrentCustomer } from "@/lib/current-customer";
 import { getUser, isAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOverdueInvoices, creditOverrideActive } from "@/lib/invoices";
@@ -12,11 +13,11 @@ export async function OverdueBanner() {
   if (!user || isAdmin(user.email)) return null;
 
   const admin = createAdminClient();
-  const { data: customer } = await admin
-    .from("customers")
-    .select("id, credit_hold_override_until")
-    .eq("user_id", user.id)
-    .maybeSingle<{ id: string; credit_hold_override_until: string | null }>();
+  const customer = await getCurrentCustomer<{ id: string; credit_hold_override_until: string | null }>(
+    admin,
+    user.id,
+    "id, credit_hold_override_until",
+  );
   if (!customer) return null;
 
   const overdue = await getOverdueInvoices(customer.id, admin);
