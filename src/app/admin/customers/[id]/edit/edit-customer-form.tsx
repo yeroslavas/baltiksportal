@@ -46,7 +46,7 @@ export function EditCustomerForm({
 
       <div className="flex flex-col gap-1.5 sm:col-span-2">
         <label className="text-sm font-medium text-stone-700">
-          Login email *
+          Contact email *
         </label>
         <input
           name="email"
@@ -56,9 +56,9 @@ export function EditCustomerForm({
           className={inputClass}
         />
         <p className="text-xs text-stone-500">
-          This is the customer&apos;s sign-in email. Changing it updates their
-          login — pricing and history stay intact. Consider resetting their
-          password and letting the new contact know.
+          Where account notices go (auto-pay receipts, failures). This is NOT a
+          sign-in credential — an account can have several logins, each with its
+          own email. Manage those under Logins on the customer&apos;s page.
         </p>
       </div>
 
