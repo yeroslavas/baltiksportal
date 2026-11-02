@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createOrderForCustomer } from "@/lib/orders";
+import { createOrderForCustomer, priceOrder } from "@/lib/orders";
 import { getSettings } from "@/lib/settings";
 import { addDays } from "@/lib/standing-orders";
 import { ORDER_STATUSES, type OrderStatus } from "@/lib/types";
@@ -274,4 +274,138 @@ export async function reinstateOrder(formData: FormData) {
   revalidatePath("/admin/orders");
   revalidatePath(`/admin/orders/${id}`);
   revalidatePath("/admin/invoices");
+}
+
+export type UpdateItemsResult = { ok?: true; error?: string };
+
+// Change what's ON an order after it's placed — the phone call that says "make
+// that two dozen plain, not three". Previously the only route was cancelling and
+// re-entering the whole order.
+//
+// Re-prices through priceOrder, the SAME path used by checkout, admin create and
+// the Stripe amount, so there is no second pricing implementation to drift. That
+// does mean an order edited after a catalog price change is repriced at today's
+// prices — which is why the form shows the before/after total: visible, never
+// silent. Allowed at any status (a fulfilled order's record should be able to
+// match what actually went out); the UI warns past cutoff.
+export async function updateOrderItems(
+  orderId: string,
+  lines: { productId: string; quantity: number; sliced?: boolean }[],
+): Promise<UpdateItemsResult> {
+  await requireAdmin();
+
+  if (!orderId) return { error: "Missing order." };
+  const cleanLines = (Array.isArray(lines) ? lines : [])
+    .map((l) => ({
+      productId: String(l?.productId ?? ""),
+      quantity: Number(l?.quantity),
+      sliced: Boolean(l?.sliced),
+    }))
+    .filter((l) => l.productId && Number.isFinite(l.quantity) && l.quantity > 0);
+  if (cleanLines.length === 0) {
+    return { error: "An order needs at least one item with a quantity." };
+  }
+
+  const admin = createAdminClient();
+
+  const { data: order } = await admin
+    .from("orders")
+    .select("id, order_number, customer_id, fulfillment_type, total_amount")
+    .eq("id", orderId)
+    .maybeSingle<{
+      id: string;
+      order_number: number;
+      customer_id: string;
+      fulfillment_type: "delivery" | "pickup";
+      total_amount: number;
+    }>();
+  if (!order) return { error: "Order not found." };
+
+  const priced = await priceOrder({
+    customerId: order.customer_id,
+    lines: cleanLines,
+    type: order.fulfillment_type,
+  });
+  if ("error" in priced) return { error: priced.error };
+
+  const totalChanged = priced.total !== Number(order.total_amount);
+
+  // Refuse to move the amount under a payment that already happened. The admin
+  // needs to deal with the invoice deliberately (credit or refund) first — the
+  // same rule as the delivery/pickup swap in updateOrderFulfillment.
+  const { data: invoice } = await admin
+    .from("invoices")
+    .select("id, invoice_number, status, stripe_payment_id")
+    .eq("order_id", orderId)
+    .maybeSingle<{
+      id: string;
+      invoice_number: string;
+      status: string;
+      stripe_payment_id: string | null;
+    }>();
+  if (invoice && totalChanged) {
+    const settled =
+      invoice.status === "paid" || invoice.stripe_payment_id !== null;
+    if (settled) {
+      return {
+        error: `This change moves the total from $${Number(order.total_amount).toFixed(2)} to $${priced.total.toFixed(2)}, but invoice ${invoice.invoice_number} is already paid or has a payment in flight. Adjust the invoice first (credit or refund), then edit the items.`,
+      };
+    }
+  }
+
+  // Replace the lines. There's no transaction available through the JS client,
+  // so keep the old rows in hand and put them back if the insert fails — an
+  // order with no items at all would be worse than a failed edit.
+  const { data: previousItems } = await admin
+    .from("order_items")
+    .select("product_id, product_name, quantity, unit_price, line_total, sliced")
+    .eq("order_id", orderId);
+
+  const { error: delError } = await admin
+    .from("order_items")
+    .delete()
+    .eq("order_id", orderId);
+  if (delError) return { error: delError.message };
+
+  const { error: insError } = await admin
+    .from("order_items")
+    .insert(priced.items.map((i) => ({ order_id: orderId, ...i })));
+  if (insError) {
+    if (previousItems?.length) {
+      await admin
+        .from("order_items")
+        .insert(previousItems.map((i) => ({ order_id: orderId, ...i })));
+    }
+    return { error: `Could not save the items: ${insError.message}` };
+  }
+
+  const { error: orderError } = await admin
+    .from("orders")
+    .update({
+      total_amount: priced.total,
+      delivery_fee: priced.deliveryFee,
+      slice_fee: priced.sliceFee ?? 0,
+    })
+    .eq("id", orderId);
+  if (orderError) return { error: orderError.message };
+
+  // Keep an open invoice in step. A paid or canceled one is history and stays as
+  // issued (and a total change against a settled invoice was refused above).
+  if (
+    invoice &&
+    totalChanged &&
+    (invoice.status === "unpaid" || invoice.status === "overdue")
+  ) {
+    await admin
+      .from("invoices")
+      .update({ total_amount: priced.total })
+      .eq("id", invoice.id);
+  }
+
+  revalidatePath(`/admin/orders/${orderId}`);
+  revalidatePath("/admin/orders");
+  revalidatePath("/admin/invoices");
+  if (invoice) revalidatePath(`/admin/invoices/${invoice.id}`);
+  revalidatePath("/admin");
+  return { ok: true };
 }
